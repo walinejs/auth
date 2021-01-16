@@ -1,0 +1,17 @@
+{
+  "name": "@waline/auth",
+  "private": true,
+  "description": "social account auth service provider",
+  "version": "1.0.0",
+  "author": "lizheming <i@imnerd.org>",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "koa": "^2.13.1",
+    "request": "^2.88.2",
+    "request-promise-native": "^1.0.9"
+  },
+  "repository": "https://github.com/walinejs/auth",
+  "license": "MIT"
+}
