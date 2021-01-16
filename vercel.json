@@ -1,7 +1,7 @@
 {
   "version": 2,
   "github": {
-    "slient": true
+    "silent": true
   },
   "builds": [
     { "src": "index.js", "use": "@now/node" }
