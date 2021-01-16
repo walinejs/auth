@@ -5,6 +5,10 @@ const app = new Koa();
 
 app.use(async (ctx, next) => {
   const type = ctx.path.slice(1).toLowerCase();
+  if(/^wb_[a-z0-9]+\.txt/.test(type)) {
+    return this.ctx.body = 'open.weibo.com';
+  }
+  
   if(!services[type]) {
     return next();
   }
