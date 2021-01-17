@@ -1,2 +1,3 @@
 exports.github = require('./github');
 exports.weibo = require('./weibo');
+exports.twitter = require('./twitter');

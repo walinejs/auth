@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "koa": "^2.13.1",
+    "leancloud-storage": "^4.9.0",
+    "oauth-1.0a": "^2.2.6",
     "request": "^2.88.2",
     "request-promise-native": "^1.0.9"
   },
