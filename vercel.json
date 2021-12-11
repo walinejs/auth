@@ -4,9 +4,11 @@
     "silent": true
   },
   "builds": [
+    { "src": "index.html", "use": "@now/static"},
     { "src": "index.js", "use": "@now/node" }
   ],
   "routes": [
+    { "src": "/", "dest": "index.html"},
     { "src": "/(.*)", "dest": "/index.js" }
   ]
 }
