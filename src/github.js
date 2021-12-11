@@ -48,7 +48,13 @@ module.exports = class extends Base {
       }
     }
     
-    return userInfo;
+    return {
+      id: userInfo.login,
+      name: userInfo.name,
+      email: userInfo.email,
+      url: userInfo.blog,
+      avatar: userInfo.avatar_url,
+    };
   }
 
   async redirect() {
