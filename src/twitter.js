@@ -130,7 +130,7 @@ module.exports = class extends Base {
     const accessTokenInfo = await this.getAccessToken({oauth_verifier, oauth_token});
     const userInfo = await this.getUserInfoByToken(accessTokenInfo);
     return this.ctx.body = {
-      id: userInfo.id,
+      id: userInfo.screen_name,
       name: userInfo.name,
       email: userInfo.email,
       url: userInfo.url,
