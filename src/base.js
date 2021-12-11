@@ -23,6 +23,7 @@ module.exports = class {
       return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + 'code=' + code);
     }
 
+    this.ctx.type = 'json';
     const accessTokenInfo = await this.getAccessToken(code);
     const userInfo = await this.getUserInfoByToken(accessTokenInfo);
     return this.ctx.body = userInfo;
