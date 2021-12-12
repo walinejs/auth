@@ -38,7 +38,7 @@ module.exports = class extends Base {
       method: 'GET',
       json: true,
     });
-    
+
     return {
       id: user.id,
       name: user.name,
@@ -72,7 +72,7 @@ module.exports = class extends Base {
       return this.redirect();
     }
 
-    if(redirect) {
+    if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
       return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + 'code=' + code);
     }
 
