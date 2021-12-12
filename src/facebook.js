@@ -30,10 +30,18 @@ module.exports = class extends Base {
   }
 
   async getUserInfoByToken({access_token}) {
-    return request.get(USER_INFO_URL + '?' + qs.stringify({
+    const user = await request.get(USER_INFO_URL + '?' + qs.stringify({
       access_token,
-      fields: ['id', 'name', 'email', 'short_name'].join()
+      fields: ['id','name','email','picture','link'].join()
     }));
+    
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      url: user.link,
+      avatar: user.picture.data.url,
+    }
   }
 
   async redirect() {
