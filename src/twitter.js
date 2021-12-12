@@ -121,7 +121,7 @@ module.exports = class extends Base {
       return this.redirect();
     }
 
-    if(redirect) {
+    if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
       return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({oauth_verifier, oauth_token}));
     }
 
