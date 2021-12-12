@@ -116,13 +116,13 @@ module.exports = class extends Base {
   }
 
   async getUserInfo() {
-    const {oauth_verifier, oauth_token, redirect} = this.ctx.params;
+    const {oauth_verifier, oauth_token, redirect, state} = this.ctx.params;
     if(!oauth_verifier || !oauth_token) {
       return this.redirect();
     }
 
     if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
-      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({oauth_verifier, oauth_token}));
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({oauth_verifier, oauth_token, state}));
     }
 
     // { oauth_token, oauth_token_secret, user_id, screen_name }

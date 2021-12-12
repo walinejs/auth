@@ -66,14 +66,14 @@ module.exports = class extends Base {
   }
 
   async getUserInfo() {
-    const {code, state} = this.ctx.params;
-    const {redirect} = qs.parse(state);
+    const {code, state: _state} = this.ctx.params;
+    const {redirect, state} = qs.parse(_state);
     if(!code) {
       return this.redirect();
     }
 
     if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
-      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + 'code=' + code);
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
     }
 
     this.ctx.type = 'json';

@@ -13,13 +13,13 @@ module.exports = class {
   }
 
   async getUserInfo() {
-    const {code, redirect} = this.ctx.params;
+    const {code, redirect, state} = this.ctx.params;
     if(!code) {
       return this.redirect();
     }
 
     if(redirect) {
-      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + 'code=' + code);
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
     }
 
     this.ctx.type = 'json';
