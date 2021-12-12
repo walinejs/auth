@@ -1,3 +1,4 @@
+const qs = require('querystring');
 module.exports = class {
   constructor(ctx) {
     this.ctx = ctx;
