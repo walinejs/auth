@@ -13,12 +13,12 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
-    const {url, state} = this.ctx.params;
+    const {state} = this.ctx.params;
     const params = {
       client_id: FACEBOOK_ID,
       client_secret: FACEBOOK_SECRET,
       code,
-      redirect_uri: this.getCompleteUrl('/facebook') + '?' + qs.stringify({redirect: url, state})
+      redirect_uri: this.getCompleteUrl('/facebook') + '?' + qs.stringify({state})
     };
 
     return request.post({
