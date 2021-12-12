@@ -12,7 +12,6 @@ module.exports = class {
     return protocol + '://' + host + url;
   }
 
-
   async getUserInfo() {
     const {code, redirect} = this.ctx.params;
     if(!code) {

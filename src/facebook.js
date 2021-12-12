@@ -20,7 +20,6 @@ module.exports = class extends Base {
       code,
       redirect_uri: this.getCompleteUrl('/facebook') + '?' + qs.stringify({redirect: url, state})
     };
-    console.log('after:', params.redirect_uri);
 
     return request.post({
       url: ACCESS_TOKEN_URL,
@@ -39,8 +38,9 @@ module.exports = class extends Base {
 
   async redirect() {
     const {redirect, state} = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/facebook') + '?' + qs.stringify({redirect, state});
-    console.log('before:', redirectUrl);
+    const redirectUrl = this.getCompleteUrl('/facebook') + '?' + qs.stringify({
+      state: qs.stringify({redirect, state})
+    });
 
     const url = OAUTH_URL + '?' + qs.stringify({
       client_id: FACEBOOK_ID,
@@ -51,5 +51,22 @@ module.exports = class extends Base {
       display: 'popup',
     });
     return this.ctx.redirect(url);
+  }
+
+  async getUserInfo() {
+    const {code, state} = this.ctx.params;
+    const {redirect} = qs.parse(state);
+    if(!code) {
+      return this.redirect();
+    }
+
+    if(redirect) {
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + 'code=' + code);
+    }
+
+    this.ctx.type = 'json';
+    const accessTokenInfo = await this.getAccessToken(code);
+    const userInfo = await this.getUserInfoByToken(accessTokenInfo);
+    return this.ctx.body = userInfo;
   }
 };
