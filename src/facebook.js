@@ -40,7 +40,7 @@ module.exports = class extends Base {
       name: user.name,
       email: user.email,
       url: user.link,
-      avatar: user.picture?.data?.url || user.picture,
+      avatar: typeof user.picture === 'object' ? user.picture.data.url : user.picture,
     }
   }
 
