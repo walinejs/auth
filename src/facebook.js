@@ -35,9 +35,9 @@ module.exports = class extends Base {
         access_token,
         fields: ['id','name','email','picture','link'].join()
       }),
-      method: 'GET'
+      method: 'GET',
+      json: true,
     });
-    console.log(user);
     
     return {
       id: user.id,
