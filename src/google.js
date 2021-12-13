@@ -13,13 +13,13 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
-    const {url, state} = this.ctx.params;
+    const {url} = this.ctx.params;
     const params = {
       client_id: GOOGLE_ID,
       client_secret: GOOGLE_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: this.getCompleteUrl('/google') + '?' + qs.stringify({redirect: url, state})
+      redirect_uri: this.getCompleteUrl('/google') + '?' + qs.stringify({redirect: url})
     };
 
     return request.post({
@@ -31,16 +31,27 @@ module.exports = class extends Base {
   }
 
   async getUserInfoByToken({access_token}) {
-    return request.get(USER_INFO_URL, {
+    const user = await request({
+      url: USER_INFO_URL,
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${access_token}`
-      }
+      },
+      json: true
     });
+    
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      url: '',
+      avatar: user.picture,
+    }
   }
 
   async redirect() {
     const {redirect, state} = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/google') + '?' + qs.stringify({redirect, state});
+    const redirectUrl = this.getCompleteUrl('/google') + '?' + qs.stringify({redirect});
 
     const url = OAUTH_URL + '?' + qs.stringify({
       client_id: GOOGLE_ID,
@@ -52,6 +63,7 @@ module.exports = class extends Base {
       response_type: 'code',
       access_type: 'offline',
       prompt: 'consent',
+      state,
     });
     return this.ctx.redirect(url);
   }
