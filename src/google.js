@@ -13,13 +13,12 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
-    const {url} = this.ctx.params;
     const params = {
       client_id: GOOGLE_ID,
       client_secret: GOOGLE_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: this.getCompleteUrl('/google') + '?' + qs.stringify({redirect: url})
+      redirect_uri: this.getCompleteUrl('/google')
     };
 
     return request.post({
@@ -51,7 +50,7 @@ module.exports = class extends Base {
 
   async redirect() {
     const {redirect, state} = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/google') + '?' + qs.stringify({redirect});
+    const redirectUrl = this.getCompleteUrl('/google');
 
     const url = OAUTH_URL + '?' + qs.stringify({
       client_id: GOOGLE_ID,
@@ -63,8 +62,25 @@ module.exports = class extends Base {
       response_type: 'code',
       access_type: 'offline',
       prompt: 'consent',
-      state,
+      state: qs.stringify({redirect, state}),
     });
     return this.ctx.redirect(url);
+  }
+
+  async getUserInfo() {
+    const {code, state: _state} = this.ctx.params;
+    const {redirect, state} = qs.parse(_state);
+    if(!code) {
+      return this.redirect();
+    }
+
+    if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
+    }
+
+    this.ctx.type = 'json';
+    const accessTokenInfo = await this.getAccessToken(code);
+    const userInfo = await this.getUserInfoByToken(accessTokenInfo);
+    return this.ctx.body = userInfo;
   }
 };
