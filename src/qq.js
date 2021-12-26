@@ -22,11 +22,16 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
+    const {redirect, state} = this.ctx.params;
+    const redirectUrl = this.getCompleteUrl('/qq') + '?' + qs.stringify({redirect, state});
+
     const params = {
       client_id: QQ_ID,
       client_secret: QQ_SECRET,
       grant_type: 'authorization_code',
-      code
+      redirect_uri: redirectUrl,
+      code,
+      fmt: 'json'
     };
 
     return request.post({
@@ -37,11 +42,15 @@ module.exports = class extends Base {
   }
 
   async getUserInfoByToken({access_token}) {
-    const tokenInfo = await request.get(TOKEN_INFO_URL + '?access_token=' + access_token, {json: true});
+    const tokenInfo = await request.get(TOKEN_INFO_URL + '?' + qs.stringify({
+      access_token,
+      fmt: 'json'
+    }), {json: true});
     return request.get(USER_INFO_URL + '?' + qs.stringify({
       access_token, 
-      uid: tokenInfo.openid,
-      oauth_comsumer_key: QQ_ID,
+      openid: tokenInfo.openid,
+      oauth_consumer_key: tokenInfo.client_id,
+      format: 'json',
     }), {json: true});
   }
 }
