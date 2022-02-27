@@ -50,7 +50,7 @@ module.exports = class extends Base {
     
     return {
       id: userInfo.login,
-      name: userInfo.name,
+      name: userInfo.name || userInfo.login,
       email: userInfo.email,
       url: userInfo.blog,
       avatar: userInfo.avatar_url,
