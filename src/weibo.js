@@ -22,11 +22,13 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
+    const redirectUrl = this.getCompleteUrl('/weibo');
     const params = {
       client_id: WEIBO_ID,
       client_secret: WEIBO_SECRET,
       grant_type: 'authorization_code',
-      code
+      code,
+      redirect_uri: redirectUrl
     };
 
     return request.post({
