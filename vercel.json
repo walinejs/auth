@@ -4,8 +4,8 @@
     "silent": true
   },
   "builds": [
-    { "src": "index.html", "use": "@now/static"},
-    { "src": "index.js", "use": "@now/node" }
+    { "src": "index.html", "use": "@vercel/static"},
+    { "src": "index.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/", "dest": "index.html"},
