@@ -39,7 +39,11 @@ module.exports = class extends Base {
   }
 
   async getUserInfoByToken({access_token}) {
-    const tokenInfo = await request.get(TOKEN_INFO_URL + '?access_token=' + access_token, {json: true});
+    const tokenInfo = await request.post({
+      url: TOKEN_INFO_URL,
+      form: { access_token },
+      json: true,
+    });
     return request.get(USER_INFO_URL + '?' + qs.stringify({access_token, uid: tokenInfo.uid}), {json: true});
   }
 }
