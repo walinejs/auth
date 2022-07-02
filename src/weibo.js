@@ -46,7 +46,7 @@ module.exports = class extends Base {
     });
     const userInfo = await request.get(USER_INFO_URL + '?' + qs.stringify({access_token, uid: tokenInfo.uid}), {json: true});
     return {
-      id: userInfo.id,
+      id: userInfo.idstr,
       name: userInfo.screen_name || userInfo.name,
       email: '',
       url: userInfo.url || `https://weibo.com/u/${userInfo.id}`,
