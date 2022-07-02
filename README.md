@@ -1,6 +1,6 @@
 # OAuth Center
 
-The easiest way to add user login to websites with [Github][Github], [Twitter][Twitter], [Facebook][Facebook], [Google][Google].
+The easiest way to add user login to websites with [Github][Github], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo].
 ## Deploy Your Own
 
 Deploy your own Waline project with Vercel.
@@ -35,8 +35,15 @@ Deploy your own Waline project with Vercel.
 - Rediect URL: `<a href="<serverUrl>/google?redirect=&state=">Login with Google</a>`
 - Get user info: `GET <serverUrl>/google?code=`
 
+### Weibo
+
+`WEIBO_ID` and `WEIBO_SECRET` enviroment variables are required.
+
+- Rediect URL: `<a href="<serverUrl>/weibo?redirect=&state=">Login with Weibo</a>`
+- Get user info: `GET <serverUrl>/weibo?code=`
+
   [Github]: https://github.com
   [Twitter]: https://twitter.com
   [Facebook]: https://facebook.com
   [Google]: https://google.com
-
+  [Weibo]: https://weibo.com
