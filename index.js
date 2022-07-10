@@ -16,7 +16,13 @@ app.use(async (ctx, next) => {
   ctx.params = qs.parse(ctx.search.slice(1));
 
   const service = new services[type](ctx);
-  return service.getUserInfo();
+  return service.getUserInfo().catch(e => {
+    ctx.status = e.statusCode || 500;
+    ctx.body = JSON.stringify({
+      errno: ctx.status,
+      message: e.message
+    });
+  });
 });
 
 module.exports = app.callback();
