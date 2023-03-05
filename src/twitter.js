@@ -130,7 +130,7 @@ module.exports = class extends Base {
     const accessTokenInfo = await this.getAccessToken({oauth_verifier, oauth_token});
     const userInfo = await this.getUserInfoByToken(accessTokenInfo);
     return this.ctx.body = {
-      id: userInfo.screen_name,
+      id: userInfo.id_str, // https://stackoverflow.com/questions/4132900/url-link-to-twitter-user-with-id-not-name
       name: userInfo.name,
       email: userInfo.email,
       url: userInfo.url,
