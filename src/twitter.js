@@ -133,7 +133,7 @@ module.exports = class extends Base {
       id: userInfo.id_str, // https://stackoverflow.com/questions/4132900/url-link-to-twitter-user-with-id-not-name
       name: userInfo.name,
       email: userInfo.email,
-      url: userInfo.url,
+      url: userInfo.url || `https://twitter.com/i/user/${userInfo.id_str}`,
       avatar: userInfo.profile_image_url_https,
     };
   }
