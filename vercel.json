@@ -9,6 +9,7 @@
   ],
   "routes": [
     { "src": "/", "dest": "index.html"},
+    { "src": "/ui(.*)", "dest": "index.html"},
     { "src": "/(.*)", "dest": "/index.js" }
   ]
 }
