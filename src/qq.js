@@ -44,13 +44,23 @@ module.exports = class extends Base {
   async getUserInfoByToken({access_token}) {
     const tokenInfo = await request.get(TOKEN_INFO_URL + '?' + qs.stringify({
       access_token,
+      unionid: 1,
       fmt: 'json'
     }), {json: true});
-    return request.get(USER_INFO_URL + '?' + qs.stringify({
+
+    const userInfo = await request.get(USER_INFO_URL + '?' + qs.stringify({
       access_token, 
       openid: tokenInfo.openid,
       oauth_consumer_key: tokenInfo.client_id,
       format: 'json',
     }), {json: true});
+
+    return {
+      id: tokenInfo.unionid,
+      name: userInfo.nickname,
+      email: undefined,
+      url: undefined,
+      avatar: userInfo.figureurl_qq_2 || userInfo.figureurl_qq_1 || userInfo.figureurl_qq || userInfo.figureurl_2 || userInfo.figureurl_1 || userInfo.figureurl,
+    };
   }
 }
