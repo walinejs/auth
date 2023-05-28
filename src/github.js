@@ -52,7 +52,7 @@ module.exports = class extends Base {
       id: userInfo.login,
       name: userInfo.name || userInfo.login,
       email: userInfo.email,
-      url: userInfo.blog,
+      url: userInfo.blog || `https://github.com/${userInfo.login}`,
       avatar: userInfo.avatar_url,
     };
   }
