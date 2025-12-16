@@ -1,4 +1,4 @@
-const qs = require('qs');
+const qs = require('querystring');
 const Koa = require('koa');
 const services = require('./src');
 const app = new Koa();
