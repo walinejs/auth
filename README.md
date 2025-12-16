@@ -1,6 +1,7 @@
 # OAuth Center
 
-The easiest way to add user login to websites with [GitHub][GitHub], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo], [QQ][QQ].
+The easiest way to add user login to websites with [GitHub][GitHub], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo], [QQ][QQ], and [OpenID Connect (OIDC)][OIDC].
+
 ## Deploy Your Own
 
 Deploy your own Waline project with Vercel.
@@ -49,6 +50,14 @@ Deploy your own Waline project with Vercel.
 - Redirect URL: `<a href="<serverUrl>/qq?redirect=&state=">Login with QQ</a>`
 - Get user info: `GET <serverUrl>/qq?code=`
 
+### OIDC (OpenID Connect)
+
+`OIDC_ID`, `OIDC_SECRET` and either `OIDC_ISSUER` or explicit endpoints `OIDC_AUTH_URL`, `OIDC_TOKEN_URL`, `OIDC_USERINFO_URL` are required.  
+Optional: `OIDC_SCOPES` (default `openid profile email`).
+
+- Redirect URL: `<a href="<serverUrl>/oidc?redirect=&state=">Login with OIDC</a>`
+- Get user info: `GET <serverUrl>/oidc?code=`
+
 
   [GitHub]: https://github.com
   [Twitter]: https://twitter.com
@@ -56,3 +65,4 @@ Deploy your own Waline project with Vercel.
   [Google]: https://google.com
   [Weibo]: https://weibo.com
   [QQ]: https://qq.com
+  [OIDC]: https://openid.net/connect/
