@@ -5,6 +5,9 @@ module.exports = class {
   }
 
   getCompleteUrl(url = '') {
+    if (process.env.BASE_URL) {
+      return process.env.BASE_URL.replace(/\/$/, '') + (url.startsWith('/') ? url : '/' + url);
+    }
     const protocol = this.ctx.header['x-forwarded-proto'] || 'http';
     const host = this.ctx.header['x-forwarded-host'] || this.ctx.host;
     if (!/^\//.test(url)) {
