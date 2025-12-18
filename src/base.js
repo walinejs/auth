@@ -5,15 +5,15 @@ module.exports = class {
   }
 
   getCompleteUrl(url = '') {
-    if (process.env.BASE_URL) {
-      return process.env.BASE_URL.replace(/\/$/, '') + (url.startsWith('/') ? url : '/' + url);
-    }
+    const { SERVER_URL } = process.env;
     const protocol = this.ctx.header['x-forwarded-proto'] || 'http';
     const host = this.ctx.header['x-forwarded-host'] || this.ctx.host;
+    
+    const baseUrl = SERVER_URL || protocol + '://' + host;
     if (!/^\//.test(url)) {
       url = '/' + url;
     }
-    return protocol + '://' + host + url;
+    return baseUrl + url;
   }
 
   async getUserInfo() {
