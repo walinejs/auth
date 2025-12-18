@@ -8,7 +8,7 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "koa": "2.16.3",
+    "koa": "3.1.1",
     "leancloud-storage": "4.12.3",
     "oauth-1.0a": "2.2.6",
     "oauth-sign": "0.9.0",
