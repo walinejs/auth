@@ -11,6 +11,12 @@ module.exports = class extends Base {
   static check() {
     return GOOGLE_ID && GOOGLE_SECRET;
   }
+
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
   
   constructor(ctx) {
     super(ctx);

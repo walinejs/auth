@@ -18,6 +18,12 @@ module.exports = class extends Base {
     return TWITTER_ID && TWITTER_SECRET;
   }
   
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
+  
   constructor(ctx) {
     super(ctx);
     this._session = new Storage('twitter');

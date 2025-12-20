@@ -29,6 +29,12 @@ module.exports = class extends Base {
     return OIDC_AUTH_URL && OIDC_TOKEN_URL && OIDC_USERINFO_URL && OIDC_ID && OIDC_SECRET;
   }
   
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
+  
   async redirect() {
     const { redirect, state } = this.ctx.params;
     const redirectUrl =

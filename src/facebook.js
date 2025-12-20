@@ -12,6 +12,12 @@ module.exports = class extends Base {
     return FACEBOOK_ID && FACEBOOK_SECRET;
   }
 
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
+  
   constructor(ctx) {
     super(ctx);
   }

@@ -13,6 +13,12 @@ module.exports = class extends Base {
     return QQ_ID && QQ_SECRET;
   }
   
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
+  
   redirect() {
     const {redirect, state} = this.ctx.params;
     const redirectUrl = this.getCompleteUrl('/qq') + '?' + qs.stringify({redirect, state});

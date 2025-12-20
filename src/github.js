@@ -13,6 +13,12 @@ module.exports = class extends Base {
     return GITHUB_ID && GITHUB_SECRET;
   }
   
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
+  
   async getAccessToken(code) {
     const params = {
       client_id: GITHUB_ID,

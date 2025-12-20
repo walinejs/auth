@@ -12,6 +12,12 @@ module.exports = class extends Base {
   static check() {
     return WEIBO_ID && WEIBO_SECRET;
   }
+
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
+  }
   
   redirect() {
     const {redirect, state} = this.ctx.params;

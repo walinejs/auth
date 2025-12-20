@@ -1,5 +1,6 @@
 const qs = require('querystring');
 const Koa = require('koa');
+const pkg = require('./package.json');
 const services = require('./src');
 const app = new Koa();
 
@@ -12,11 +13,15 @@ app.use((ctx, next) => {
   for(const type in services) {
     const service = services[type];
     if (typeof service.check === 'function' && service.check()) {
-      avaliableService.push(type);
+      avaliableService.push({
+        name: type,
+        ...service.info(),
+      });
     }
   }
   
   ctx.body = {
+    version: pkg.version,
     services: avaliableService
   };
   
