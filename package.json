@@ -14,7 +14,7 @@
     "oauth-sign": "0.9.0",
     "request": "2.88.2",
     "request-promise-native": "1.0.9",
-    "uuid": "13.0.0"
+    "uuid": "^12.0.0"
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT"
