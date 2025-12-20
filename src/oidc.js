@@ -25,6 +25,10 @@ async function getDiscovery() {
 }
 
 module.exports = class extends Base {
+  static check() {
+    return OIDC_AUTH_URL && OIDC_TOKEN_URL && OIDC_USERINFO_URL && OIDC_ID && OIDC_SECRET;
+  }
+  
   async redirect() {
     const { redirect, state } = this.ctx.params;
     const redirectUrl =

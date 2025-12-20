@@ -8,6 +8,10 @@ const USER_INFO_URL = 'https://graph.facebook.com/me';
 
 const {FACEBOOK_ID, FACEBOOK_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return FACEBOOK_ID && FACEBOOK_SECRET;
+  }
+
   constructor(ctx) {
     super(ctx);
   }

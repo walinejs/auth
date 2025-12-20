@@ -8,6 +8,10 @@ const USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 const {GOOGLE_ID, GOOGLE_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return GOOGLE_ID && GOOGLE_SECRET;
+  }
+  
   constructor(ctx) {
     super(ctx);
   }

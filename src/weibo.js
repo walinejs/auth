@@ -9,6 +9,10 @@ const USER_INFO_URL = 'https://api.weibo.com/2/users/show.json';
 
 const {WEIBO_ID, WEIBO_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return WEIBO_ID && WEIBO_SECRET;
+  }
+  
   redirect() {
     const {redirect, state} = this.ctx.params;
     const redirectUrl = this.getCompleteUrl('/weibo') + '?' + qs.stringify({redirect, state});

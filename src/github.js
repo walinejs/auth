@@ -9,6 +9,10 @@ const USER_EMAILS = 'https://api.github.com/user/emails';
 
 const {GITHUB_ID, GITHUB_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return GITHUB_ID && GITHUB_SECRET;
+  }
+  
   async getAccessToken(code) {
     const params = {
       client_id: GITHUB_ID,

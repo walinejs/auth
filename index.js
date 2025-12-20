@@ -3,6 +3,26 @@ const Koa = require('koa');
 const services = require('./src');
 const app = new Koa();
 
+app.use((ctx, next) => {
+  if (ctx.path !== '/') {
+    return next();
+  }
+  
+  const avaliableService = [];
+  for(const type in services) {
+    const service = services[type];
+    if (typeof service.check === 'function' && service.check()) {
+      avaliableService.push(type);
+    }
+  }
+  
+  ctx.body = {
+    services: avaliableService
+  };
+  
+  next();
+});
+
 app.use(async (ctx, next) => {
   const type = ctx.path.slice(1).toLowerCase();
   if(/^wb_[a-z0-9]+\.txt/.test(type)) {

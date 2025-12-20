@@ -14,6 +14,10 @@ const USER_INFO_URL = 'https://api.twitter.com/1.1/account/verify_credentials.js
 
 const {TWITTER_ID, TWITTER_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return TWITTER_ID && TWITTER_SECRET;
+  }
+  
   constructor(ctx) {
     super(ctx);
     this._session = new Storage('twitter');

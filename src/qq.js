@@ -9,6 +9,10 @@ const USER_INFO_URL = 'https://graph.qq.com/user/get_user_info';
 
 const {QQ_ID, QQ_SECRET} = process.env;
 module.exports = class extends Base {
+  static check() {
+    return QQ_ID && QQ_SECRET;
+  }
+  
   redirect() {
     const {redirect, state} = this.ctx.params;
     const redirectUrl = this.getCompleteUrl('/qq') + '?' + qs.stringify({redirect, state});
