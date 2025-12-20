@@ -34,7 +34,7 @@ module.exports = class extends Base {
   
   static info() {
     return {
-      origin: new URL(OAUTH_URL).hostname
+      origin: new URL(OIDC_ISSUER || OIDC_AUTH_URL).hostname
     };
   }
   
