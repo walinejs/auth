@@ -41,25 +41,25 @@ module.exports = class extends Base {
   async redirect() {
     const { redirect, state } = this.ctx.params;
     const { authorization_endpoint } = await getDiscovery();
-    const url = authorization_endpoint + '?' + qs.stringify({
+    const query = {
       client_id: OIDC_ID,
-      redirect_uri: redirect,
+      redirect_uri: this.getCompleteUrl('/oidc'),
       response_type: 'code',
       scope: OIDC_SCOPES || 'openid profile email',
-      state: typeof state === 'string' ? state : '',
-    });
+      state: qs.stringify({ redirect, state }),
+    };
+    const url = authorization_endpoint + '?' + qs.stringify(query);
     return this.ctx.redirect(url);
   }
 
   async getAccessToken(code) {
-    const { redirect } = this.ctx.params;
     const { token_endpoint } = await getDiscovery();
     const params = {
       client_id: OIDC_ID,
       client_secret: OIDC_SECRET,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirect,
+      redirect_uri: this.getCompleteUrl('/oidc'),
     };
     return request.post({
       url: token_endpoint,

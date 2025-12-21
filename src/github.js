@@ -23,7 +23,8 @@ module.exports = class extends Base {
     const params = {
       client_id: GITHUB_ID,
       client_secret: GITHUB_SECRET,
-      code
+      code,
+      redirect_uri: this.getCompleteUrl('/github')
     };
 
     return request.post({
@@ -69,13 +70,31 @@ module.exports = class extends Base {
 
   async redirect() {
     const {redirect, state} = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/github') + '?' + qs.stringify({redirect, state});
-
+    const redirectUrl = this.getCompleteUrl('/github');
+    
     const url = OAUTH_URL + '?' + qs.stringify({
       client_id: GITHUB_ID,
       redirect_uri: redirectUrl,
-      scope: 'read:user,user:email'
+      scope: 'read:user,user:email',
+      state: qs.stringify({redirect, state})
     });
     return this.ctx.redirect(url);
+  }
+
+  async getUserInfo() {
+    const {code, state: _state} = this.ctx.params;
+    const {redirect, state} = qs.parse(_state);
+    if(!code) {
+      return this.redirect();
+    }
+
+    if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
+    }
+
+    this.ctx.type = 'json';
+    const accessTokenInfo = await this.getAccessToken(code);
+    const userInfo = await this.getUserInfoByToken(accessTokenInfo);
+    return this.ctx.body = userInfo;
   }
 };

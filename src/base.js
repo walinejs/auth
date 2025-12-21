@@ -5,11 +5,11 @@ module.exports = class {
   }
 
   getCompleteUrl(url = '') {
-    const { SERVER_URL } = process.env;
+    const { SERVER_URL, BASE_URL } = process.env;
     const protocol = this.ctx.header['x-forwarded-proto'] || 'http';
     const host = this.ctx.header['x-forwarded-host'] || this.ctx.host;
     
-    const baseUrl = SERVER_URL || protocol + '://' + host;
+    const baseUrl = SERVER_URL || BASE_URL || protocol + '://' + host;
     if (!/^\//.test(url)) {
       url = '/' + url;
     }
@@ -22,7 +22,7 @@ module.exports = class {
       return this.redirect();
     }
 
-    if(redirect) {
+    if(redirect && this.ctx.header['user-agent'] !== '@waline') {
       return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
     }
 
