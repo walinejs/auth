@@ -34,20 +34,16 @@ module.exports = class extends Base {
   
   static info() {
     return {
-      origin: new URL(OAUTH_URL).hostname
+      origin: new URL(OIDC_ISSUER || OIDC_AUTH_URL).hostname
     };
   }
   
   async redirect() {
     const { redirect, state } = this.ctx.params;
-    const redirectUrl =
-      this.getCompleteUrl('/oidc') +
-      '?' +
-      qs.stringify({ redirect, state });
     const { authorization_endpoint } = await getDiscovery();
     const url = authorization_endpoint + '?' + qs.stringify({
       client_id: OIDC_ID,
-      redirect_uri: redirectUrl,
+      redirect_uri: redirect,
       response_type: 'code',
       scope: OIDC_SCOPES || 'openid profile email',
       state: typeof state === 'string' ? state : '',
@@ -56,14 +52,14 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
-    const redirectUrl = this.getCompleteUrl('/oidc');
+    const { redirect } = this.ctx.params;
     const { token_endpoint } = await getDiscovery();
     const params = {
       client_id: OIDC_ID,
       client_secret: OIDC_SECRET,
       grant_type: 'authorization_code',
       code,
-      redirect_uri: redirectUrl,
+      redirect_uri: redirect,
     };
     return request.post({
       url: token_endpoint,
