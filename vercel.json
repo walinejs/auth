@@ -7,6 +7,7 @@
     { "src": "index.js", "use": "@vercel/node" }
   ],
   "routes": [
+    { "src": "/", dest: "cache/index.json" },
     { "src": "/(.*)", "dest": "/index.js" }
   ]
 }
