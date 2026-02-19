@@ -8,7 +8,7 @@
     { "src": "cache/(.*)", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/", dest: "cache/index.json" },
+    { "src": "/", "dest": "cache/index.json" },
     { "src": "/(.*)", "dest": "/index.js" }
   ]
 }
