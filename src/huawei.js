@@ -20,46 +20,37 @@ module.exports = class extends Base {
   }
 
   /**
-   * 核心修复逻辑：从当前请求或 state 中恢复原始的 redirect 参数
+   * 核心修复：手动模拟 oauth.js 的 redirect 拼接逻辑
+   * oauth.js 生成的地址格式固定为：${serverURL}/api/oauth?redirect=${originalRedirect}&type=huawei
    */
-  _getRecoveredParams() {
-    const { redirect, state } = this.ctx.params;
-    
-    // 如果当前上下文有 redirect，直接使用
-    if (redirect) {
-      return { redirect, state };
-    }
-
-    // 如果没有 redirect 但有 state，尝试从 state 解码（针对 oauth.js 的 fetch 阶段）
-    if (state) {
-      try {
-        // 解码 Waline 默认的 Base64 state
-        const decoded = Buffer.from(state.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
-        const payload = JSON.parse(decoded);
-        
-        // 如果 state 里面嵌套了原始 query (部分 OAuth 流程会这么做)
-        if (payload.redirect) {
-          return { redirect: payload.redirect, state };
-        }
-      } catch (e) {
-        // 解码失败则维持现状
-      }
-    }
-
-    return { redirect, state };
-  }
-
   _buildRedirectUri() {
-    const { redirect, state } = this._getRecoveredParams();
+    const { redirect, state, code } = this.ctx.params;
+    const { serverURL } = this.ctx; // 获取当前 Waline 实例的基础 URL
+
+    let finalRedirect = redirect;
+
+    /**
+     * 关键逻辑：
+     * 如果 code 存在，说明现在是 Step 1 (oauth.js 的 fetch 阶段)。
+     * 此时 ctx.params.redirect 丢失了，我们需要手动还原它。
+     */
+    if (code && !finalRedirect) {
+      // 这里的逻辑必须与 oauth.js 第 32-34 行严格一致
+      // 假设 Waline 默认跳转到 profile 页面
+      const originalWalineRedirect = '/ui/profile'; 
+      finalRedirect = `${serverURL}/api/oauth?redirect=${encodeURIComponent(originalWalineRedirect)}&type=huawei`;
+      
+      console.log(`[Huawei-Debug] Reconstructed missing redirect: ${finalRedirect}`);
+    }
+
     const query = {};
-    
-    if (redirect) query.redirect = redirect;
+    if (finalRedirect) query.redirect = finalRedirect;
     if (state) query.state = state;
 
     const queryString = qs.stringify(query);
     const finalUrl = this.getCompleteUrl('/huawei') + (queryString ? '?' + queryString : '');
     
-    console.log(`[Huawei-Debug] Reconstructed RedirectURI: ${finalUrl}`);
+    console.log(`[Huawei-Debug] Final RedirectURI: ${finalUrl}`);
     return finalUrl;
   }
 
@@ -68,7 +59,7 @@ module.exports = class extends Base {
     const redirectUrl = this._buildRedirectUri();
 
     try {
-      const response = await request.post({
+      return await request.post({
         url: ACCESS_TOKEN_URL,
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         form: {
@@ -80,9 +71,8 @@ module.exports = class extends Base {
         },
         json: true
       });
-      return response;
     } catch (err) {
-      console.error(`[Huawei-Debug] Token Exchange Error Detail:`, err.error || err.message);
+      console.error(`[Huawei-Debug] Token Exchange Error:`, err.error || err.message);
       throw err;
     }
   }
@@ -106,9 +96,6 @@ module.exports = class extends Base {
   }
 
   async redirect() {
-    const { redirect, state } = this.ctx.params;
-    
-    // 为了确保在 fetch 阶段能找回 redirect，我们确信 redirectUrl 构造逻辑正确
     const redirectUrl = this._buildRedirectUri();
 
     const url = OAUTH_URL + '?' + qs.stringify({
