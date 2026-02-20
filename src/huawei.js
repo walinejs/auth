@@ -20,48 +20,20 @@ module.exports = class extends Base {
   }
 
   /**
-   * 核心修复：手动模拟 oauth.js 的 redirect 拼接逻辑
-   * oauth.js 生成的地址格式固定为：${serverURL}/api/oauth?redirect=${originalRedirect}&type=huawei
+   * Step 1: code -> token
    */
-  _buildRedirectUri() {
-    const { redirect, state, code } = this.ctx.params;
-    const { serverURL } = this.ctx; // 获取当前 Waline 实例的基础 URL
-
-    let finalRedirect = redirect;
-
-    /**
-     * 关键逻辑：
-     * 如果 code 存在，说明现在是 Step 1 (oauth.js 的 fetch 阶段)。
-     * 此时 ctx.params.redirect 丢失了，我们需要手动还原它。
-     */
-    if (code && !finalRedirect) {
-      // 这里的逻辑必须与 oauth.js 第 32-34 行严格一致
-      // 假设 Waline 默认跳转到 profile 页面
-      const originalWalineRedirect = '/ui/profile'; 
-      finalRedirect = `${serverURL}/api/oauth?redirect=${encodeURIComponent(originalWalineRedirect)}&type=huawei`;
-      
-      console.log(`[Huawei-Debug] Reconstructed missing redirect: ${finalRedirect}`);
-    }
-
-    const query = {};
-    if (finalRedirect) query.redirect = finalRedirect;
-    if (state) query.state = state;
-
-    const queryString = qs.stringify(query);
-    const finalUrl = this.getCompleteUrl('/huawei') + (queryString ? '?' + queryString : '');
-    
-    console.log(`[Huawei-Debug] Final RedirectURI: ${finalUrl}`);
-    return finalUrl;
-  }
-
   async getAccessToken(code) {
-    console.log(`[Huawei-Debug] Step 1: Token Exchange Start`);
-    const redirectUrl = this._buildRedirectUri();
+    // 【重要】这里的 redirect_uri 必须与 redirect() 方法中的完全一致，且在华为后台注册过
+    const redirectUrl = this.getCompleteUrl('/huawei');
+    
+    console.log(`[Huawei OAuth] Attempting to exchange code for token. Code: ${code.substring(0, 10)}...`);
 
     try {
-      return await request.post({
+      const response = await request.post({
         url: ACCESS_TOKEN_URL,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
         form: {
           grant_type: 'authorization_code',
           client_id: HUAWEI_ID,
@@ -71,41 +43,79 @@ module.exports = class extends Base {
         },
         json: true
       });
-    } catch (err) {
-      console.error(`[Huawei-Debug] Token Exchange Error:`, err.error || err.message);
-      throw err;
+
+      if (response.error) {
+        console.error('[Huawei OAuth] Token exchange error response:', response);
+      }
+      return response;
+    } catch (e) {
+      console.error('[Huawei OAuth] Network error during token exchange:', e.message);
+      throw e;
     }
   }
 
+  /**
+   * Step 2: parse id_token
+   */
   async getUserInfoByToken(tokenResponse) {
-    const { id_token } = tokenResponse;
-    if (!id_token) throw new Error('Huawei OAuth failed: no id_token');
+    const { id_token, access_token } = tokenResponse;
 
-    const payload = JSON.parse(
-      Buffer.from(id_token.split('.')[1], 'base64').toString()
-    );
+    if (!id_token) {
+      console.error('[Huawei OAuth] No id_token found in response. Response keys:', Object.keys(tokenResponse));
+      throw new Error('Huawei OAuth failed: no id_token');
+    }
 
-    return this.formatUserResponse({
-      id: payload.sub,
-      name: payload.nickname || payload.display_name || payload.sub,
-      email: payload.email || `${payload.sub}@huawei-uuid.com`,
-      avatar: payload.picture,
-      url: undefined,
-      originalResponse: payload
-    }, 'huawei');
+    try {
+      // id_token 是 JWT 格式: header.payload.signature
+      const segments = id_token.split('.');
+      if (segments.length !== 3) {
+        throw new Error('Invalid JWT format');
+      }
+
+      const payload = JSON.parse(
+        Buffer.from(segments[1], 'base64').toString()
+      );
+
+      console.log('[Huawei OAuth] Decoded user payload:', payload);
+
+      // 华为 payload 字段映射
+      return this.formatUserResponse({
+        id: payload.sub, // 唯一标识
+        name: payload.nickname || payload.display_name || payload.name || payload.sub,
+        email: payload.email || `${payload.sub}@huawei-uuid.com`,
+        avatar: payload.picture,
+        url: undefined,
+        originalResponse: payload
+      }, 'huawei');
+
+    } catch (e) {
+      console.error('[Huawei OAuth] Failed to parse id_token:', e.message);
+      throw e;
+    }
   }
 
+  /**
+   * Step 0: redirect user to Huawei login
+   */
   async redirect() {
-    const redirectUrl = this._buildRedirectUri();
+    const { redirect, state } = this.ctx.params;
+
+    // 保持 redirect_uri 简洁，避免华为校验失败
+    const redirectUrl = this.getCompleteUrl('/huawei');
+
+    // 将原本在 URL 上的参数封装进 OAuth 的 state 字段中
+    // 这样在回调时，这些信息会原样返回给 callback 接口
+    const oauthState = qs.stringify({ redirect, state });
 
     const url = OAUTH_URL + '?' + qs.stringify({
       client_id: HUAWEI_ID,
       redirect_uri: redirectUrl,
       response_type: 'code',
-      scope: 'openid profile email'
+      scope: 'openid profile email',
+      state: oauthState 
     });
 
-    console.log(`[Huawei-Debug] Step 0: Redirecting to Huawei`);
+    console.log(`[Huawei OAuth] Redirecting to: ${url}`);
     return this.ctx.redirect(url);
   }
 };
