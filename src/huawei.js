@@ -25,11 +25,9 @@ module.exports = class extends Base {
   async getAccessToken(code) {
 
     const { redirect, state } = this.ctx.params;
-
-    const redirectUrl =
-      this.getCompleteUrl('/huawei') +
-      '?' +
-      qs.stringify({ redirect, state });
+    const query = { redirect, state };
+    Object.keys(query).forEach(key => query[key] === undefined && delete query[key]);
+    const redirectUrl = this.getCompleteUrl('/huawei') + (Object.keys(query).length ? '?' + qs.stringify(query) : '');
 
     return request.post({
       url: ACCESS_TOKEN_URL,
