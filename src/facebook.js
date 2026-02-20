@@ -49,13 +49,21 @@ module.exports = class extends Base {
       json: true,
     });
 
-    return {
+    // Extract avatar from Facebook's nested picture response
+    let avatar = '';
+    if (typeof user.picture === 'object' && user.picture.data && user.picture.data.url) {
+      avatar = user.picture.data.url;
+    } else if (typeof user.picture === 'string') {
+      avatar = user.picture;
+    }
+
+    return this.formatUserResponse({
       id: user.id,
       name: user.name,
-      email: user.email,
-      url: user.link,
-      avatar: typeof user.picture === 'object' ? user.picture.data.url : user.picture,
-    }
+      email: user.email || undefined,
+      url: user.link || undefined,
+      avatar: avatar || undefined,
+    }, 'facebook');
   }
 
   async redirect() {

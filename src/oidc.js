@@ -83,13 +83,14 @@ module.exports = class extends Base {
       ? rawAvatar.trim().replace(/^`+|`+$/g, '').replace(/^\"+|\"+$/g, '')
       : undefined;
     const profileUrl = user.profile || user.website || (typeof user.url === 'string' ? user.url : '');
-    return {
+    
+    return this.formatUserResponse({
       id: user.sub,
       name: user.name || user.preferred_username || user.nickname,
-      email: user.email,
-      url: profileUrl || '',
-      avatar,
-    };
+      email: user.email || undefined,
+      url: profileUrl || undefined,
+      avatar: avatar || undefined,
+    }, 'oidc');
   }
 
   async getUserInfo() {

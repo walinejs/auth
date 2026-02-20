@@ -1,150 +1,234 @@
 const Base = require('./base');
 const crypto = require('crypto');
 const qs = require('querystring');
-const OAuth = require('oauth-1.0a');
-const oauthSign = require('oauth-sign');
-const uuid = require('uuid');
-const Storage = require('./utils/storage/leancloud');
 const request = require('request-promise-native');
 
-const REQUEST_TOKEN_URL = 'https://api.twitter.com/oauth/request_token';
-const OAUTH_URL = 'https://api.twitter.com/oauth/authorize';
-const ACCESS_TOKEN_URL = 'https://api.twitter.com/oauth/access_token';
-const USER_INFO_URL = 'https://api.twitter.com/1.1/account/verify_credentials.json';
+const AUTH_URL = 'https://x.com/i/oauth2/authorize';
+const TOKEN_URL = 'https://api.x.com/2/oauth2/token';
+const USER_INFO_URL = 'https://api.x.com/2/users/me';
 
-const {TWITTER_ID, TWITTER_SECRET} = process.env;
+const TWITTER_CLIENT_ID = process.env.TWITTER_ID;
+const TWITTER_CLIENT_SECRET = process.env.TWITTER_SECRET;
+
+// PKCE helpers
+function base64url(buf) {
+  return buf.toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function generatePKCE() {
+  const verifier = base64url(crypto.randomBytes(32));
+  const challenge = base64url(
+    crypto.createHash('sha256').update(verifier).digest()
+  );
+  return { verifier, challenge };
+}
+
+/**
+ * Encode state data to base64 for stateless operation
+ */
+function encodeStateData(data) {
+  return Buffer.from(JSON.stringify(data)).toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+/**
+ * Decode state data from base64
+ */
+function decodeStateData(encoded) {
+  try {
+    const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
+    const decoded = Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
 module.exports = class extends Base {
   static check() {
-    return TWITTER_ID && TWITTER_SECRET;
+    return TWITTER_CLIENT_ID && TWITTER_CLIENT_SECRET;
   }
-  
+
   static info() {
     return {
-      origin: new URL(OAUTH_URL).hostname
+      origin: new URL(AUTH_URL).hostname
     };
-  }
-  
-  constructor(ctx) {
-    super(ctx);
-    this._session = new Storage('twitter');
-    this._oauth = OAuth({
-      consumer: {
-        key: TWITTER_ID,
-        secret: TWITTER_SECRET
-      },
-      signature_method: 'HMAC-SHA1',
-      hash_function: (baseString, key) => {
-        return crypto.createHmac('sha1', key).update(baseString).digest('base64')
-      }
-    });
-  }
-
-  async getAccessToken({oauth_verifier, oauth_token}) {
-    const oauth_token_secret = await this._session.get(oauth_token);
-    if(!oauth_token_secret) {
-      return {};
-    }
-
-    const requestData = {
-      url: ACCESS_TOKEN_URL,
-      method: 'POST',
-      data: {
-        oauth_token,
-        oauth_verifier,
-        oauth_token_secret
-      }
-    };
-    
-    const resp = await request({
-      ...requestData,
-      form: requestData.data,
-      headers: this._oauth.toHeader(this._oauth.authorize(requestData))
-    });
-    return qs.parse(resp);
-  }
-
-  async getUserInfoByToken({ oauth_token, oauth_token_secret }) {
-    const url = USER_INFO_URL;
-    const consumerKey = TWITTER_ID;
-    const consumerSecretKey = TWITTER_SECRET;
-  
-    const oauthToken = oauth_token;
-    const oauthTokenSecret = oauth_token_secret;
-  
-    const timestamp = Date.now() / 1000;
-    const nonce = uuid.v4().replace(/-/g, '');
-  
-    const params = {
-      include_email: true,
-      oauth_consumer_key: consumerKey,
-      oauth_nonce: nonce,
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: timestamp,
-      oauth_token: oauthToken,
-      oauth_version: '1.0'
-    };
-  
-    params.oauth_signature = oauthSign.hmacsign('GET', url, params, consumerSecretKey, oauthTokenSecret);
-  
-    const auth = Object.keys(params).sort().map(function (k) {
-      return k + '="' + oauthSign.rfc3986(params[k]) + '"';
-    }).join(', ');
-  
-    const resp = await request({
-      url: url + '?include_email=true',
-      headers: {
-        Authorization: 'OAuth ' + auth
-      },
-      json: true
-    });
-    return resp;
   }
 
   async redirect() {
-    const {redirect, state} = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/twitter') + '?' + qs.stringify({redirect, state});
+    const { redirect, state } = this.ctx.params;
+    const callbackUrl = this.getCompleteUrl('/twitter');
 
-    const requestData = {
-      url: REQUEST_TOKEN_URL,
-      method: 'POST',
-      data: {
-        oauth_callback: redirectUrl
-      }
-    };
-    const requestToken = await request({
-      ...requestData,
-      form: requestData.data,
-      headers: this._oauth.toHeader(this._oauth.authorize(requestData))
+    const { verifier, challenge } = generatePKCE();
+
+    // Encode all necessary state data (PKCE verifier, redirect URL, original state)
+    const stateData = encodeStateData({
+      verifier,
+      redirect,
+      state,
+      callbackUrl
     });
-    
-    const {oauth_token, oauth_token_secret} = qs.parse(requestToken);
-    
-    await this._session.set(oauth_token, oauth_token_secret);
 
-    const url = OAUTH_URL + '?' + qs.stringify({oauth_token});
-    return this.ctx.redirect(url);
+    const params = {
+      response_type: 'code',
+      client_id: TWITTER_CLIENT_ID,
+      redirect_uri: callbackUrl,
+      scope: [
+        'tweet.read',
+        'users.read',
+        'offline.access',
+        'users.email'
+      ].join(' '),
+      state: stateData,
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    };
+
+    return this.ctx.redirect(AUTH_URL + '?' + qs.stringify(params));
+  }
+
+  async getAccessToken({ code, stateData }) {
+    const { verifier, callbackUrl } = stateData;
+    const credentials = Buffer.from(`${TWITTER_CLIENT_ID}:${TWITTER_CLIENT_SECRET}`).toString('base64');
+
+    return await request({
+      url: TOKEN_URL,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      form: {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUrl,
+        code_verifier: verifier
+      },
+      json: true
+    });
+  }
+
+
+
+  async getUserInfoByToken(access_token) {
+    const url = USER_INFO_URL +
+      '?user.fields=name,username,profile_image_url,url,confirmed_email';
+
+    return await request({
+      url,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      },
+      json: true
+    });
   }
 
   async getUserInfo() {
-    const {oauth_verifier, oauth_token, redirect, state} = this.ctx.params;
-    if(!oauth_verifier || !oauth_token) {
+    const { code, state: encodedState } = this.ctx.params;
+
+    // 检查客户端是否期待 JSON
+    const wantsJSON = (
+      (this.ctx.headers.accept || '').includes('application/json') ||
+      this.ctx.headers['user-agent'] === '@waline'
+    );
+
+    // 如果没有 code 或 state，则
+    if (!code || !encodedState) {
+      if (wantsJSON) {
+        this.ctx.status = 400;
+        this.ctx.body = {
+          error: 'missing_code_or_state',
+          message: 'OAuth callback requires both code and state parameters.'
+        };
+        return;
+      }
+      // 浏览器访问 → 重定向去授权
       return this.redirect();
     }
 
-    if(redirect && this.ctx.headers['user-agent'] !== '@waline') {
-      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({oauth_verifier, oauth_token, state}));
+    this.ctx.type = 'json';
+
+    // 尝试 decode state（用于 PKCE）
+    const stateData = decodeStateData(encodedState);
+    if (!stateData) {
+      this.ctx.status = 400;
+      this.ctx.body = { 
+        error: 'invalid_state',
+        message: 'OAuth state is invalid or could not be decoded.'
+      };
+      return;
     }
 
-    // { oauth_token, oauth_token_secret, user_id, screen_name }
-    this.ctx.type = 'json';
-    const accessTokenInfo = await this.getAccessToken({oauth_verifier, oauth_token});
-    const userInfo = await this.getUserInfoByToken(accessTokenInfo);
-    return this.ctx.body = {
-      id: userInfo.id_str, // https://stackoverflow.com/questions/4132900/url-link-to-twitter-user-with-id-not-name
-      name: userInfo.name,
-      email: userInfo.email,
-      url: userInfo.url || `https://twitter.com/i/user/${userInfo.id_str}`,
-      avatar: userInfo.profile_image_url_https,
-    };
+    const { redirect } = stateData;
+
+    // 区分 fetch 还是浏览器访问
+    const isBrowser = !wantsJSON;
+
+    // 如果是浏览器访问，并且 redirect 有值，则跳回客户端（带 code & state）
+    if (isBrowser && redirect) {
+      return this.ctx.redirect(
+        redirect +
+        (redirect.includes('?') ? '&' : '?') +
+        qs.stringify({ code, state: encodedState })
+      );
+    }
+
+    // 到这里：我们要进行 Token 交换 + 获取用户信息
+    let tokenInfo;
+    try {
+      tokenInfo = await this.getAccessToken({ code, stateData });
+    } catch (err) {
+      this.ctx.status = 500;
+      this.ctx.body = {
+        error: 'token_exchange_failed',
+        message: err.message || 'Failed to obtain access token from Twitter.',
+        details: err.error || null
+      };
+      return;
+    }
+
+    if (!tokenInfo || !tokenInfo.access_token) {
+      this.ctx.status = 401;
+      this.ctx.body = {
+        error: 'no_access_token',
+        message: 'Twitter did not return an access token.',
+        raw: tokenInfo
+      };
+      return;
+    }
+
+    // 获取用户信息
+    let userInfo;
+    try {
+      userInfo = await this.getUserInfoByToken(tokenInfo.access_token);
+    } catch (err) {
+      this.ctx.status = 500;
+      this.ctx.body = {
+        error: 'user_info_fetch_failed',
+        message: err.message || 'Failed to fetch user info from Twitter.',
+        details: err.error || null
+      };
+      return;
+    }
+
+    const u = userInfo && userInfo.data ? userInfo.data : {};
+
+    // 返回结构化的 JSON 用户信息
+    this.ctx.status = 200;
+    this.ctx.body = this.formatUserResponse({
+      id: u.id,
+      name: u.name || u.username,
+      email: u.email || u.confirmed_email || `${u.id}@twitter-uuid.com`,
+      url: u.url || (u.username ? `https://twitter.com/${u.username}` : undefined),
+      avatar: u.profile_image_url || undefined,
+      originalResponse: u
+    }, 'twitter');
   }
+
 };

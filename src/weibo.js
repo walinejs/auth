@@ -55,12 +55,13 @@ module.exports = class extends Base {
       json: true,
     });
     const userInfo = await request.get(USER_INFO_URL + '?' + qs.stringify({access_token, uid: tokenInfo.uid}), {json: true});
-    return {
+    
+    return this.formatUserResponse({
       id: userInfo.idstr,
       name: userInfo.screen_name || userInfo.name,
-      email: '',
+      email: undefined,
       url: userInfo.url || `https://weibo.com/u/${userInfo.id}`,
       avatar: userInfo.avatar_large || userInfo.profile_image_url,
-    }
+    }, 'weibo');
   }
 }

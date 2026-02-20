@@ -4,11 +4,9 @@
     "silent": true
   },
   "builds": [
-    { "src": "index.js", "use": "@vercel/node" },
-    { "src": "cache/(.*)", "use": "@vercel/static" }
+    { "src": "index.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/", "dest": "cache/index.json" },
     { "src": "/(.*)", "dest": "/index.js" }
   ]
 }

@@ -58,13 +58,14 @@ module.exports = class extends Base {
       }
     }
     
-    return {
+    return this.formatUserResponse({
       id: userInfo.login,
       name: userInfo.name || userInfo.login,
-      email: userInfo.email,
-      url: userInfo.blog || `https://github.com/${userInfo.login}`,
+      email: userInfo.email || undefined,
+      url: (userInfo.blog && userInfo.blog.trim()) ? userInfo.blog : `https://github.com/${userInfo.login}`,
       avatar: userInfo.avatar_url,
-    };
+      originalResponse: userInfo
+    }, 'github');
   }
 
   async redirect() {
