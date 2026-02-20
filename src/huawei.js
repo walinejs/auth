@@ -22,18 +22,41 @@ module.exports = class extends Base {
   /**
    * 华为回调入口逻辑修正
    */
+  // huawei.js 内部修改
   async indexAction() {
-    const { code } = this.ctx.params;
+    const { code, state } = this.ctx.params;
 
-    // 如果 URL 里已经有 code 了，说明是从华为跳回来的，不应该再跳转
     if (code) {
-        console.log('[Huawei OAuth] Callback detected with code, proceeding to get token.');
-        // 这里由 Base 类或你的框架逻辑调用 getAccessToken 和 getUserInfoByToken
-        // 如果你的框架 indexAction 会自动处理流程，请确保它不会走到下面的 redirect
-        return super.indexAction ? await super.indexAction() : null; 
+      console.log('[Huawei OAuth] Callback detected, fetching user info...');
+      
+      // 1. 获取 Token 和 用户信息
+      const tokenResponse = await this.getAccessToken(code);
+      const userInfo = await this.getUserInfoByToken(tokenResponse);
+
+      // 2. 从 state 中还原 Waline 的回调地址 (r)
+      let walineCallbackUrl = '';
+      if (state) {
+        try {
+          const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
+          walineCallbackUrl = decodedState.r; // 对应之前存入的 redirect
+        } catch (e) {
+          console.error('[Huawei OAuth] Failed to parse state:', e);
+        }
+      }
+
+      // 3. 如果有 walineCallbackUrl，则带上 code 和 state 跳回 Waline
+      if (walineCallbackUrl) {
+        const finalJump = walineCallbackUrl + (walineCallbackUrl.includes('?') ? '&' : '?') + 
+                          qs.stringify({ code, state });
+        
+        console.log(`[Huawei OAuth] Final jump back to Waline: ${finalJump}`);
+        return this.ctx.redirect(finalJump);
+      }
+
+      // 如果没有跳转地址，才输出 JSON (兜底)
+      return this.ctx.success(userInfo);
     }
 
-    // 如果没有 code，才去执行重定向到华为
     return this.redirect();
   }
 
