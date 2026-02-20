@@ -64,27 +64,30 @@ module.exports = class extends Base {
    * Step 1: code -> token
    */
   async getAccessToken(code) {
-    const redirectUrl = this.getCompleteUrl('/huawei');
-    
-    console.log(`[Huawei OAuth] Exchanging code: ${code.substring(0, 10)}...`);
+    const { redirect, state } = this.ctx.params;
+    const redirectUrl = this.getCompleteUrl('/huawei') + '?' + qs.stringify({ redirect, state });
 
-    const response = await request.post({
-      url: ACCESS_TOKEN_URL,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      form: {
-        grant_type: 'authorization_code',
-        client_id: HUAWEI_ID,
-        client_secret: HUAWEI_SECRET,
-        code,
-        redirect_uri: redirectUrl
-      },
-      json: true
-    });
+    console.log('[Huawei Debug] Requesting Access Token with RedirectURI:', redirectUrl);
 
-    console.log('[Huawei OAuth] Token Response:', response);
-    return response;
+    try {
+      const response = await request.post({
+        url: ACCESS_TOKEN_URL,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        form: {
+          grant_type: 'authorization_code',
+          client_id: HUAWEI_ID,
+          client_secret: HUAWEI_SECRET,
+          code,
+          redirect_uri: redirectUrl
+        },
+        json: true
+      });
+      console.log('[Huawei Debug] Token Response:', response); // 检查是否包含 id_token
+      return response;
+    } catch (err) {
+      console.error('[Huawei Debug] Access Token Request Failed:', err.message);
+      throw err;
+    }
   }
 
   /**
@@ -94,24 +97,32 @@ module.exports = class extends Base {
     const { id_token } = tokenResponse;
 
     if (!id_token) {
-      console.error('[Huawei OAuth] Error: No id_token in response');
+      console.error('[Huawei Debug] No id_token found in response!');
       throw new Error('Huawei OAuth failed: no id_token');
     }
 
-    const payload = JSON.parse(
-      Buffer.from(id_token.split('.')[1], 'base64').toString()
-    );
+    try {
+      const payload = JSON.parse(
+        Buffer.from(id_token.split('.')[1], 'base64').toString()
+      );
+      console.log('[Huawei Debug] Decoded ID Token Payload:', payload);
 
-    console.log('[Huawei OAuth] User Payload:', payload);
-
-    return this.formatUserResponse({
-      id: payload.sub,
-      name: payload.nickname || payload.display_name || payload.name || payload.sub,
-      email: payload.email || `${payload.sub}@huawei-uuid.com`,
-      avatar: payload.picture,
-      url: undefined,
-      originalResponse: payload
-    }, 'huawei');
+      // 格式化输出前打印，确认 sub (id) 是否存在
+      const formatted = this.formatUserResponse({
+        id: payload.sub,
+        name: payload.nickname || payload.display_name || payload.sub,
+        email: payload.email || `${payload.sub}@huawei-uuid.com`,
+        avatar: payload.picture,
+        url: undefined,
+        originalResponse: payload
+      }, 'huawei');
+      
+      console.log('[Huawei Debug] Final Formatted User:', formatted);
+      return formatted;
+    } catch (e) {
+      console.error('[Huawei Debug] JWT Decode Error:', e);
+      throw e;
+    }
   }
 
   /**
