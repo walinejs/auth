@@ -64,9 +64,10 @@ module.exports = class extends Base {
   }
 
   async getAccessToken(code) {
-    // Note: We use the clean URL here because Huawei requires the redirect_uri 
-    // to match what was sent in the initial Step 0 exactly.
-    const redirectUrl = this.getCompleteUrl('/huawei');
+    const { state } = this.ctx.params; 
+    // We no longer pull 'redirect' from params here because it's in the state
+    
+    const redirectUrl = this.getCompleteUrl('/huawei'); 
 
     return request.post({
       url: ACCESS_TOKEN_URL,
@@ -76,7 +77,7 @@ module.exports = class extends Base {
         client_id: HUAWEI_ID,
         client_secret: HUAWEI_SECRET,
         code,
-        redirect_uri: redirectUrl
+        redirect_uri: redirectUrl // Clean URL
       },
       json: true
     });
@@ -102,25 +103,17 @@ module.exports = class extends Base {
 
   async redirect() {
     const { redirect, state } = this.ctx.params;
-    
-    // 1. Your redirect_uri should be a clean, static URL registered in Huawei Console
     const callbackUrl = this.getCompleteUrl('/huawei'); 
 
-    // 2. Combine your Waline internal state and the return redirect into one object
-    // This ensures 'redirect' is preserved through the Huawei round-trip
-    const extendedState = Buffer.from(JSON.stringify({
-      s: state,      // Original Waline state
-      r: redirect    // The frontend URL to return to
-    })).toString('base64');
-
-    const url = think.buildUrl(OAUTH_URL, {
+    // We use the 'state' provided by oauth.js, which now contains the redirect info
+    const url = `https://oauth-login.cloud.huawei.com/oauth2/v3/authorize?${qs.stringify({
       response_type: 'code',
       client_id: HUAWEI_ID,
-      redirect_uri: callbackUrl, // No query params here!
+      redirect_uri: callbackUrl,
       scope: 'openid profile email',
       access_type: 'offline',
-      state: extendedState // Pass everything in state
-    });
+      state: state // This state now contains our 'r' (redirect) property
+    })}`;
 
     return this.ctx.redirect(url);
   }
