@@ -14,8 +14,7 @@
     "request": "2.88.2",
     "request-promise-native": "1.0.9",
     "uuid": "^11.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "jwt-decode": "^4.0.0"
+    "jsonwebtoken": "^9.0.3"
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT"
