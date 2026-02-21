@@ -102,20 +102,25 @@ module.exports = class extends Base {
 
   async redirect() {
     const { redirect, state } = this.ctx.params;
-
-    // We store the Waline callback URL (redirect) and Waline's state (state) 
-    // inside a new base64 string so we can recover them later.
-    const oauthState = Buffer.from(JSON.stringify({ r: redirect, s: state })).toString('base64');
     
-    const redirectUrl = this.getCompleteUrl('/huawei');
+    // 1. Your redirect_uri should be a clean, static URL registered in Huawei Console
+    const callbackUrl = this.getCompleteUrl('/huawei'); 
 
-    const url = OAUTH_URL + '?' + qs.stringify({
-        client_id: HUAWEI_ID,
-        redirect_uri: redirectUrl,
-        response_type: 'code',
-        scope: 'openid profile email',
-        state: oauthState
-      });
+    // 2. Combine your Waline internal state and the return redirect into one object
+    // This ensures 'redirect' is preserved through the Huawei round-trip
+    const extendedState = Buffer.from(JSON.stringify({
+      s: state,      // Original Waline state
+      r: redirect    // The frontend URL to return to
+    })).toString('base64');
+
+    const url = think.buildUrl(OAUTH_URL, {
+      response_type: 'code',
+      client_id: HUAWEI_ID,
+      redirect_uri: callbackUrl, // No query params here!
+      scope: 'openid profile email',
+      access_type: 'offline',
+      state: extendedState // Pass everything in state
+    });
 
     return this.ctx.redirect(url);
   }
