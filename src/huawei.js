@@ -27,28 +27,25 @@ module.exports = class extends Base {
     const { code, state } = this.ctx.params;
 
     if (code) {
-      console.log('[Huawei OAuth] Callback detected, fetching user info...');
-      
-      // 1. Get Token and User Info
+      // 1. Fetch data from Huawei
       const tokenResponse = await this.getAccessToken(code);
       const userInfo = await this.getUserInfoByToken(tokenResponse);
 
-      // --- NEW LOGIC START ---
-      // Check if the request wants JSON (Server-to-Server) 
-      // or if it's a browser request (based on headers or the absence of the redirect URL)
-      const isFetch = this.ctx.header['accept']?.includes('application/json') || 
-                      this.ctx.header['user-agent']?.includes('@waline');
+      // 2. Identify the caller
+      // Waline's oauth.js uses fetch() with specific headers.
+      const isServerFetch = this.ctx.header['accept']?.includes('application/json') || 
+                            this.ctx.header['user-agent']?.includes('@waline');
 
-      if (isFetch) {
-        console.log('[Huawei OAuth] Server-to-server request detected. Returning JSON.');
+      if (isServerFetch) {
+        // Return JSON directly to the Waline server
         return this.ctx.success(userInfo);
       }
-      // --- NEW LOGIC END ---
 
-      // 2. Browser logic: Restore the Waline callback address (r) from state
+      // 3. Browser logic: Redirect back to Waline
       let walineCallbackUrl = '';
       if (state) {
         try {
+          // Decode the state you created in the redirect() method below
           const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
           walineCallbackUrl = decodedState.r; 
         } catch (e) {
@@ -56,18 +53,19 @@ module.exports = class extends Base {
         }
       }
 
-      // 3. Jump back to Waline so the Waline Server can execute its CALLBACK PHASE
       if (walineCallbackUrl) {
+        // Construct the URL to send the user back to Waline's CALLBACK PHASE
         const finalJump = walineCallbackUrl + (walineCallbackUrl.includes('?') ? '&' : '?') + 
                           qs.stringify({ code, state });
         
-        console.log(`[Huawei OAuth] Redirecting browser back to Waline: ${finalJump}`);
         return this.ctx.redirect(finalJump);
       }
 
+      // Fallback if something goes wrong
       return this.ctx.success(userInfo);
     }
 
+    // If no code, this is the start of the login process
     return this.redirect();
   }
 
