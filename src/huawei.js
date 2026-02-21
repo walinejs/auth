@@ -27,7 +27,7 @@ module.exports = class extends Base {
         redirect_uri: redirectUrl,
         response_type: 'code',
         scope: 'openid profile email',
-        state
+        state: String(state)
       });
 
     return this.ctx.redirect(url);
@@ -40,7 +40,7 @@ module.exports = class extends Base {
     const redirectUrl =
       this.getCompleteUrl('/huawei') +
       '?' +
-      qs.stringify({ redirect, state });
+      qs.stringify({ redirect, state: String(state) });
 
     return request.post({
       url: ACCESS_TOKEN_URL,
