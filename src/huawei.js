@@ -20,24 +20,21 @@ module.exports = class extends Base {
   }
 
   /**
-   * 华为回调入口逻辑修正
+   * Main entry point for the callback
    */
-  // huawei.js 内部修改
   async indexAction() {
     const { code, state } = this.ctx.params;
 
     if (code) {
-      // 1. Fetch data from Huawei
+      // 1. Get Token and User Info from Huawei
       const tokenResponse = await this.getAccessToken(code);
       const userInfo = await this.getUserInfoByToken(tokenResponse);
 
-      // 2. Identify the caller
-      // Waline's oauth.js uses fetch() with specific headers.
-      const isServerFetch = this.ctx.header['accept']?.includes('application/json') || 
-                            this.ctx.header['user-agent']?.includes('@waline');
+      // 2. Identify if this is Waline Server calling via fetch()
+      const isFetch = this.ctx.header['accept']?.includes('application/json') || 
+                      this.ctx.header['user-agent']?.includes('@waline');
 
-      if (isServerFetch) {
-        // Return JSON directly to the Waline server
+      if (isFetch) {
         return this.ctx.success(userInfo);
       }
 
@@ -45,115 +42,81 @@ module.exports = class extends Base {
       let walineCallbackUrl = '';
       if (state) {
         try {
-          // Decode the state you created in the redirect() method below
           const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
           walineCallbackUrl = decodedState.r; 
         } catch (e) {
-          console.error('[Huawei OAuth] Failed to parse state:', e);
+          console.error('[Huawei OAuth] State parse error:', e);
         }
       }
 
       if (walineCallbackUrl) {
-        // Construct the URL to send the user back to Waline's CALLBACK PHASE
+        // Construct the jump back to waline.lzc2002.top/api/oauth
         const finalJump = walineCallbackUrl + (walineCallbackUrl.includes('?') ? '&' : '?') + 
                           qs.stringify({ code, state });
-        
         return this.ctx.redirect(finalJump);
       }
 
-      // Fallback if something goes wrong
       return this.ctx.success(userInfo);
     }
 
-    // If no code, this is the start of the login process
+    // Default to starting the redirect flow
     return this.redirect();
   }
 
-  /**
-   * Step 1: code -> token
-   */
   async getAccessToken(code) {
-    const { redirect, state } = this.ctx.params;
+    // Note: We use the clean URL here because Huawei requires the redirect_uri 
+    // to match what was sent in the initial Step 0 exactly.
     const redirectUrl = this.getCompleteUrl('/huawei');
 
-    console.log('[Huawei Debug] Requesting Access Token with RedirectURI:', redirectUrl);
-
-    try {
-      const response = await request.post({
-        url: ACCESS_TOKEN_URL,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        form: {
-          grant_type: 'authorization_code',
-          client_id: HUAWEI_ID,
-          client_secret: HUAWEI_SECRET,
-          code,
-          redirect_uri: redirectUrl
-        },
-        json: true
-      });
-      console.log('[Huawei Debug] Token Response:', response); // 检查是否包含 id_token
-      return response;
-    } catch (err) {
-      console.error('[Huawei Debug] Access Token Request Failed:', err.message);
-      throw err;
-    }
+    return request.post({
+      url: ACCESS_TOKEN_URL,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      form: {
+        grant_type: 'authorization_code',
+        client_id: HUAWEI_ID,
+        client_secret: HUAWEI_SECRET,
+        code,
+        redirect_uri: redirectUrl
+      },
+      json: true
+    });
   }
 
-  /**
-   * Step 2: parse id_token
-   */
   async getUserInfoByToken(tokenResponse) {
     const { id_token } = tokenResponse;
+    if (!id_token) throw new Error('Huawei OAuth failed: no id_token');
 
-    if (!id_token) {
-      console.error('[Huawei Debug] No id_token found in response!');
-      throw new Error('Huawei OAuth failed: no id_token');
-    }
+    const payload = JSON.parse(
+      Buffer.from(id_token.split('.')[1], 'base64').toString()
+    );
 
-    try {
-      const payload = JSON.parse(
-        Buffer.from(id_token.split('.')[1], 'base64').toString()
-      );
-      console.log('[Huawei Debug] Decoded ID Token Payload:', payload);
-
-      // 格式化输出前打印，确认 sub (id) 是否存在
-      const formatted = this.formatUserResponse({
-        id: payload.sub,
-        name: payload.nickname || payload.display_name || payload.sub,
-        email: payload.email || `${payload.sub}@huawei-uuid.com`,
-        avatar: payload.picture,
-        url: undefined,
-        originalResponse: payload
-      }, 'huawei');
-      
-      console.log('[Huawei Debug] Final Formatted User:', formatted);
-      return formatted;
-    } catch (e) {
-      console.error('[Huawei Debug] JWT Decode Error:', e);
-      throw e;
-    }
+    return this.formatUserResponse({
+      id: payload.sub,
+      name: payload.nickname || payload.display_name || payload.sub,
+      email: payload.email || `${payload.sub}@huawei-uuid.com`,
+      avatar: payload.picture,
+      url: undefined,
+      originalResponse: payload
+    }, 'huawei');
   }
 
-  /**
-   * Step 0: 重定向到华为
-   */
   async redirect() {
     const { redirect, state } = this.ctx.params;
+
+    // We store the Waline callback URL (redirect) and Waline's state (state) 
+    // inside a new base64 string so we can recover them later.
+    const oauthState = Buffer.from(JSON.stringify({ r: redirect, s: state })).toString('base64');
+    
     const redirectUrl = this.getCompleteUrl('/huawei');
 
-    // 关键修正：对 state 进行 Base64 编码，防止参数中的 & 和 = 干扰华为的回调解析
-    const stateObj = { r: redirect, s: state };
-    const encodedState = Buffer.from(JSON.stringify(stateObj)).toString('base64');
-
     const url = OAUTH_URL + '?' + qs.stringify({
-      client_id: HUAWEI_ID,
-      redirect_uri: redirectUrl,
-      response_type: 'code',
-      scope: 'openid profile email',
-      state: encodedState
-    });
+        client_id: HUAWEI_ID,
+        redirect_uri: redirectUrl,
+        response_type: 'code',
+        scope: 'openid profile email',
+        state: oauthState
+      });
 
-    console.log(`[Huawei OAuth] Initial Redirect to Huawei: ${url}`);
     return this.ctx.redirect(url);
   }
 };
