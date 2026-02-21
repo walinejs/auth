@@ -65,7 +65,7 @@ module.exports = class extends Base {
    */
   async getAccessToken(code) {
     const { redirect, state } = this.ctx.params;
-    const redirectUrl = this.getCompleteUrl('/huawei') + '?' + qs.stringify({ redirect, state });
+    const redirectUrl = this.getCompleteUrl('/huawei');
 
     console.log('[Huawei Debug] Requesting Access Token with RedirectURI:', redirectUrl);
 
