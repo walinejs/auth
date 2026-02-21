@@ -1,85 +1,89 @@
-const Base = require('./base.js');
+const Base = require('./base');
+const qs = require('querystring');
+const request = require('request-promise-native');
 const jwtDecode = require('jwt-decode');
-
-const {
-  HUAWEI_ID,
-  HUAWEI_SECRET
-} = process.env;
 
 const OAUTH_URL = 'https://oauth-login.cloud.huawei.com/oauth2/v3/authorize';
 const ACCESS_TOKEN_URL = 'https://oauth-login.cloud.huawei.com/oauth2/v3/token';
 
+const { HUAWEI_ID, HUAWEI_SECRET } = process.env;
+
 module.exports = class extends Base {
 
-  /**
-   * Step 1: Redirect user to Huawei OAuth
-   */
-  async getRedirectUrl({ redirect, state }) {
-    const query = {
-      client_id: HUAWEI_ID,
-      redirect_uri: redirect,
-      response_type: 'code',
-      scope: 'openid profile email',
-      state
-    };
+  static check() {
+    return HUAWEI_ID && HUAWEI_SECRET;
+  }
 
-    return `${OAUTH_URL}?${this.buildQueryString(query)}`;
+  static info() {
+    return {
+      origin: new URL(OAUTH_URL).hostname
+    };
   }
 
   /**
-   * Step 2: Exchange code for access_token + id_token
+   * Exchange code for token
+   * Huawei requires POST x-www-form-urlencoded
    */
-  async getAccessToken({ code, redirect }) {
+  async getAccessToken(code) {
 
-    const body = this.buildQueryString({
-      grant_type: 'authorization_code',
-      code,
-      client_id: HUAWEI_ID,
-      client_secret: HUAWEI_SECRET,
-      redirect_uri: redirect
-    });
-
-    const res = await fetch(ACCESS_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': '@waline'
+    return request.post({
+      url: ACCESS_TOKEN_URL,
+      form: {
+        grant_type: 'authorization_code',
+        code,
+        client_id: HUAWEI_ID,
+        client_secret: HUAWEI_SECRET,
+        redirect_uri: this.getCompleteUrl('/huawei')
       },
-      body
+      json: true
     });
+  }
 
-    const data = await res.json();
+  /**
+   * Huawei user info comes from id_token (JWT)
+   */
+  async getUserInfoByToken({ access_token, id_token }) {
 
-    if (!data.access_token || !data.id_token) {
-      throw new Error('Failed to get Huawei access_token');
+    if (!id_token) {
+      throw new Error('Missing id_token');
     }
 
-    return data;
+    const decoded = jwtDecode(id_token);
+
+    return this.formatUserResponse({
+      id: decoded.sub,
+      name: decoded.name || decoded.email || decoded.sub,
+      email: decoded.email || undefined,
+      url: undefined,
+      avatar: decoded.picture || undefined,
+      originalResponse: decoded
+    }, 'huawei');
   }
 
   /**
-   * Step 3: Decode id_token to get user info
+   * Redirect to Huawei OAuth
    */
-  async getUser({ access_token, id_token }) {
+  async redirect() {
 
-    // Huawei returns user info in id_token (JWT)
-    const decoded = jwtDecode(id_token);
+    const { redirect, state } = this.ctx.params;
 
-    /**
-     * Huawei ID token fields:
-     * sub      = user id
-     * email    = email
-     * picture  = avatar
-     * name     = display name (sometimes missing)
-     */
+    const redirectUrl =
+      this.getCompleteUrl('/huawei') +
+      '?' +
+      qs.stringify({ redirect, state });
 
-    return {
-      id: decoded.sub,
-      name: decoded.name || decoded.email || `huawei_${decoded.sub}`,
-      email: decoded.email || null,
-      avatar: decoded.picture || null,
-      url: null
-    };
+    const url =
+      OAUTH_URL +
+      '?' +
+      qs.stringify({
+        client_id: HUAWEI_ID,
+        redirect_uri: redirectUrl,
+        response_type: 'code',
+        scope: 'openid profile email',
+        state
+      });
+
+    return this.ctx.redirect(url);
   }
 
 };
