@@ -29,31 +29,42 @@ module.exports = class extends Base {
     if (code) {
       console.log('[Huawei OAuth] Callback detected, fetching user info...');
       
-      // 1. 获取 Token 和 用户信息
+      // 1. Get Token and User Info
       const tokenResponse = await this.getAccessToken(code);
       const userInfo = await this.getUserInfoByToken(tokenResponse);
 
-      // 2. 从 state 中还原 Waline 的回调地址 (r)
+      // --- NEW LOGIC START ---
+      // Check if the request wants JSON (Server-to-Server) 
+      // or if it's a browser request (based on headers or the absence of the redirect URL)
+      const isFetch = this.ctx.header['accept']?.includes('application/json') || 
+                      this.ctx.header['user-agent']?.includes('@waline');
+
+      if (isFetch) {
+        console.log('[Huawei OAuth] Server-to-server request detected. Returning JSON.');
+        return this.ctx.success(userInfo);
+      }
+      // --- NEW LOGIC END ---
+
+      // 2. Browser logic: Restore the Waline callback address (r) from state
       let walineCallbackUrl = '';
       if (state) {
         try {
           const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
-          walineCallbackUrl = decodedState.r; // 对应之前存入的 redirect
+          walineCallbackUrl = decodedState.r; 
         } catch (e) {
           console.error('[Huawei OAuth] Failed to parse state:', e);
         }
       }
 
-      // 3. 如果有 walineCallbackUrl，则带上 code 和 state 跳回 Waline
+      // 3. Jump back to Waline so the Waline Server can execute its CALLBACK PHASE
       if (walineCallbackUrl) {
         const finalJump = walineCallbackUrl + (walineCallbackUrl.includes('?') ? '&' : '?') + 
                           qs.stringify({ code, state });
         
-        console.log(`[Huawei OAuth] Final jump back to Waline: ${finalJump}`);
+        console.log(`[Huawei OAuth] Redirecting browser back to Waline: ${finalJump}`);
         return this.ctx.redirect(finalJump);
       }
 
-      // 如果没有跳转地址，才输出 JSON (兜底)
       return this.ctx.success(userInfo);
     }
 
