@@ -20,101 +20,102 @@ module.exports = class extends Base {
   }
 
   /**
-   * Main entry point for the callback
+   * Step 1: code -> token
    */
-  async indexAction() {
-    const { code, state } = this.ctx.params;
-
-    if (code) {
-      // 1. Get Token and User Info from Huawei
-      const tokenResponse = await this.getAccessToken(code);
-      const userInfo = await this.getUserInfoByToken(tokenResponse);
-
-      // 2. Identify if this is Waline Server calling via fetch()
-      const isFetch = this.ctx.header['accept']?.includes('application/json') || 
-                      this.ctx.header['user-agent']?.includes('@waline');
-
-      if (isFetch) {
-        return this.ctx.success(userInfo);
-      }
-
-      // 3. Browser logic: Redirect back to Waline
-      let walineCallbackUrl = '';
-      if (state) {
-        try {
-          const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
-          walineCallbackUrl = decodedState.r; 
-        } catch (e) {
-          console.error('[Huawei OAuth] State parse error:', e);
-        }
-      }
-
-      if (walineCallbackUrl) {
-        // Construct the jump back to waline.lzc2002.top/api/oauth
-        const finalJump = walineCallbackUrl + (walineCallbackUrl.includes('?') ? '&' : '?') + 
-                          qs.stringify({ code, state });
-        return this.ctx.redirect(finalJump);
-      }
-
-      return this.ctx.success(userInfo);
-    }
-
-    // Default to starting the redirect flow
-    return this.redirect();
-  }
-
   async getAccessToken(code) {
-    const { state } = this.ctx.params; 
-    // We no longer pull 'redirect' from params here because it's in the state
-    
-    const redirectUrl = this.getCompleteUrl('/huawei'); 
+    // DEBUG: Log the incoming code and current params
+    console.log('[Huawei Debug] Entering getAccessToken');
+    console.log('[Huawei Debug] Code:', code);
+    console.log('[Huawei Debug] Params:', this.ctx.params);
 
-    return request.post({
-      url: ACCESS_TOKEN_URL,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      form: {
-        grant_type: 'authorization_code',
-        client_id: HUAWEI_ID,
-        client_secret: HUAWEI_SECRET,
-        code,
-        redirect_uri: redirectUrl // Clean URL
-      },
-      json: true
-    });
+    // FIX: The redirect_uri must match EXACTLY what was sent in Step 0.
+    // We should NOT append query params here because they are already inside the 'state' 
+    // being handled by oauth.js.
+    const redirectUrl = this.getCompleteUrl('/huawei');
+    console.log('[Huawei Debug] Using Redirect URI:', redirectUrl);
+
+    try {
+      const response = await request.post({
+        url: ACCESS_TOKEN_URL,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        form: {
+          grant_type: 'authorization_code',
+          client_id: HUAWEI_ID,
+          client_secret: HUAWEI_SECRET,
+          code,
+          redirect_uri: redirectUrl
+        },
+        json: true
+      });
+      
+      console.log('[Huawei Debug] Access Token Response:', JSON.stringify(response));
+      return response;
+    } catch (err) {
+      console.error('[Huawei Debug] Request Error:', err.message);
+      if (err.response && err.response.body) {
+        console.error('[Huawei Debug] Error Body:', JSON.stringify(err.response.body));
+      }
+      throw err;
+    }
   }
 
+  /**
+   * Step 2: parse id_token (OFFICIAL METHOD)
+   */
   async getUserInfoByToken(tokenResponse) {
+    console.log('[Huawei Debug] Parsing user info from tokenResponse');
     const { id_token } = tokenResponse;
-    if (!id_token) throw new Error('Huawei OAuth failed: no id_token');
+
+    if (!id_token) {
+      console.error('[Huawei Debug] No id_token found in response');
+      throw new Error('Huawei OAuth failed: no id_token');
+    }
 
     const payload = JSON.parse(
       Buffer.from(id_token.split('.')[1], 'base64').toString()
     );
 
-    return this.formatUserResponse({
+    console.log('[Huawei Debug] Decoded Payload:', JSON.stringify(payload));
+
+    const result = this.formatUserResponse({
       id: payload.sub,
-      name: payload.nickname || payload.display_name || payload.sub,
+      name: payload.nickname || payload.display_name || payload.name || payload.sub,
       email: payload.email || `${payload.sub}@huawei-uuid.com`,
       avatar: payload.picture,
       url: undefined,
       originalResponse: payload
     }, 'huawei');
+
+    console.log('[Huawei Debug] Formatted User Result:', JSON.stringify(result));
+    return result;
   }
 
+  /**
+   * Step 0: redirect user to Huawei login
+   */
   async redirect() {
-    const { redirect, state } = this.ctx.params;
-    const callbackUrl = this.getCompleteUrl('/huawei'); 
+    // Note: 'state' passed from oauth.js contains the base64-encoded Waline context
+    const { state } = this.ctx.params;
+    
+    // We use a clean redirect_uri.
+    const redirectUrl = this.getCompleteUrl('/huawei');
 
-    // We use the 'state' provided by oauth.js, which now contains the redirect info
-    const url = `https://oauth-login.cloud.huawei.com/oauth2/v3/authorize?${qs.stringify({
-      response_type: 'code',
+    console.log('[Huawei Debug] Redirecting to Huawei login');
+    console.log('[Huawei Debug] Callback URL (redirect_uri):', redirectUrl);
+    console.log('[Huawei Debug] Outgoing State:', state);
+
+    const query = {
       client_id: HUAWEI_ID,
-      redirect_uri: callbackUrl,
+      redirect_uri: redirectUrl,
+      response_type: 'code',
       scope: 'openid profile email',
-      access_type: 'offline',
-      state: state // This state now contains our 'r' (redirect) property
-    })}`;
+      state: state // Forward the packed state
+    };
 
+    const url = `${OAUTH_URL}?${qs.stringify(query)}`;
+    
     return this.ctx.redirect(url);
   }
 };
