@@ -1,7 +1,7 @@
 const Base = require('./base');
 const qs = require('querystring');
 const request = require('request-promise-native');
-const jwtDecode = require('jwt-decode');
+const { jwtDecode } = require('jwt-decode');
 
 const OAUTH_URL = 'https://oauth-login.cloud.huawei.com/oauth2/v3/authorize';
 const ACCESS_TOKEN_URL = 'https://oauth-login.cloud.huawei.com/oauth2/v3/token';
