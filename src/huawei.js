@@ -172,7 +172,7 @@ module.exports = class extends Base {
     const normalized = {
       id: decoded.sub || decoded.openid || undefined,
       name: decoded.display_name || decoded.nickname || decoded.name || decoded.sub,
-      email: decoded.email || `decoded.sub@huawei-uuid.com`,
+      email: decoded.email || `${decoded.sub}@huawei-uuid.com`,
       url: undefined,
       avatar: decoded.picture || decoded.picture_url || undefined,
       originalResponse: decoded
