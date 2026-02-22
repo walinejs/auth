@@ -17,7 +17,7 @@
     "jsonwebtoken": "^9.0.3",
     "jwt-decode": "^4.0.0",
     "pg": "^8.18.0",
-    "@neondatabase/serverless": "^1.0.2"
+    "@vercel/postgres": "^0.1.0"
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT"
