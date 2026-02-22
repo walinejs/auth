@@ -3,14 +3,16 @@ const { createPool } = require('@vercel/postgres');
 
 // 1. Manually strip the sslmode to avoid the handshake conflict
 const rawUrl = process.env.POSTGRES_URL || '';
-const cleanUrl = rawUrl.replace(/([\?&])sslmode=[^&]+(&|$)/, '$1').replace(/\?$/, '');
-
-// 2. Create a persistent pool outside the handler for connection reuse
-const pool = createPool({
-  connectionString: cleanUrl,
-});
+let pool = null;
+if (rawUrl) {
+  const cleanUrl = rawUrl.replace(/([\?&])sslmode=[^&]+(&|$)/, '$1').replace(/\?$/, '');
+  pool = createPool({
+    connectionString: cleanUrl,
+  });
+}
 
 async function upsertThirdPartyInfo(platform, user) {
+  if (!pool) return true;
   try {
     console.log('[storage/db] upsert start:', platform, user.id);
 
