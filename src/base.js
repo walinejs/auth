@@ -10,15 +10,26 @@ module.exports = class {
   async formatUserResponse(userInfo, platform = '') {
     console.log('[base] formatUserResponse called:', platform);
 
-    // This is the ONLY way to do "fire-and-forget" safely on Vercel
-    waitUntil(
-      storage.upsertThirdPartyInfo(platform, userInfo)
-        .then(ok => console.log('[base] DB update result:', ok))
-        .catch(err => console.error('[base] DB background error:', err.message))
-    );
+    // 1. Safe background task execution
+    const task = storage.upsertThirdPartyInfo(platform, userInfo)
+      .then(ok => console.log('[base] DB update result:', ok))
+      .catch(err => console.error('[base] DB background error:', err.message));
 
-    // Return response immediately - the function stays alive in the background
-    return createUserResponse(userInfo, platform).get();
+    // 2. Try to use waitUntil if available, otherwise just let it float
+    if (vercelFunctions && typeof vercelFunctions.waitUntil === 'function') {
+      vercelFunctions.waitUntil(task);
+    } else {
+      console.warn('[base] waitUntil not found, task may be suspended');
+    }
+
+    // 3. Construct response
+    const response = createUserResponse(userInfo, platform);
+    const result = response.get ? response.get() : response;
+
+    // 4. THIS LOG MUST APPEAR
+    console.log('[base] Returning response data:', JSON.stringify(result));
+    
+    return result;
   }
 
   getCompleteUrl(url = '') {
