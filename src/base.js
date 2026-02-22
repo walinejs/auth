@@ -1,65 +1,61 @@
 /**
  * base.js
- * Waline OAuth base handler with optional database storage
+ * Waline OAuth Base Provider with DB storage and debug
  */
 
-import { saveUserToDB } from './utils/storage/db.js';
+import { saveUserToDB } from './db.js';
 
-/**
- * Debug logger
- */
+console.log('[storage/base] module loaded');
+
 function debug(...args) {
-  console.log('[OAuth Base]', ...args);
+  console.log('[storage/base]', ...args);
 }
 
-/**
- * Error logger
- */
 function debugError(...args) {
-  console.error('[OAuth Base ERROR]', ...args);
+  console.error('[storage/base ERROR]', ...args);
 }
 
 /**
- * Main handler
- * This MUST be exported
+ * Base provider class
+ * Waline providers extend this class
  */
-export async function handleOAuthUser(userData, context = {}) {
-  debug('handleOAuthUser called');
-  debug('Incoming userData:', JSON.stringify(userData, null, 2));
+export default class BaseProvider {
 
-  let dbResult = null;
-  let dbSuccess = false;
+  constructor(ctx, config) {
+    this.ctx = ctx;
+    this.config = config;
 
-  try {
-    debug('Attempting DB save...');
-
-    dbResult = await saveUserToDB(userData);
-
-    dbSuccess = true;
-
-    debug('DB save success:', dbResult);
-  } catch (err) {
-    dbSuccess = false;
-
-    debugError('DB save failed:', err?.message);
-    debugError(err?.stack);
+    debug('BaseProvider constructed');
   }
 
   /**
-   * ALWAYS return user object
-   * Waline must continue even if DB fails
+   * Called by provider after getting user info
    */
-  const result = {
-    ...userData,
+  async storeUser(user) {
 
-    meta: {
-      dbStored: dbSuccess,
-      dbResult: dbResult ?? null,
-      timestamp: new Date().toISOString()
+    debug('storeUser called');
+    debug('User:', JSON.stringify(user, null, 2));
+
+    try {
+
+      const dbResult = await saveUserToDB(user);
+
+      debug('DB save success:', dbResult);
+
+      return {
+        ...user,
+        dbStored: true
+      };
+
+    } catch (err) {
+
+      debugError('DB save failed:', err.message);
+
+      return {
+        ...user,
+        dbStored: false
+      };
     }
-  };
+  }
 
-  debug('Returning user:', JSON.stringify(result, null, 2));
-
-  return result;
 }
