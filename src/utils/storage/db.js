@@ -1,14 +1,17 @@
 // storage/db.js
-// Serverless-friendly PostgreSQL helper for Vercel + Neon.
-// - Reuses a single Pool across warm starts (global.__pgPool).
-// - Sets small timeouts for connections and queries to avoid hanging serverless requests.
-// - Ensures the wl_3rd_info table exists (only once per process).
+// Serverless-safe PostgreSQL helper for Vercel + Neon.
+// Features:
+// - Reuses a single Pool across warm invocations (global.__pgPool)
+// - Normalizes sslmode to avoid pg SECURITY WARNING
+// - Adds query timeouts so DB issues never hang requests
+// - Ensures wl_3rd_info table exists (once per process)
+// - Safe upsert with full logging
 
 const { Pool } = require('pg');
 
 console.log('[storage/db] module loaded');
 
-// Accept multiple env var names for convenience (match your Vercel env)
+// Accept common env var names used by Vercel, Neon, Prisma, etc.
 const POSTGRES_URL =
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_PRISMA_URL ||
@@ -18,27 +21,69 @@ const POSTGRES_URL =
 
 console.log('[storage/db] POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
 console.log('[storage/db] DATABASE_URL exists:', !!process.env.DATABASE_URL);
-console.log('[storage/db] using URL present:', !!POSTGRES_URL);
+console.log('[storage/db] raw URL present:', !!POSTGRES_URL);
 
 if (!POSTGRES_URL) {
-  console.error('[storage/db] No POSTGRES_URL provided -- DB disabled');
+  console.error('[storage/db] No database URL provided. DB functions disabled.');
 }
 
-// Pool options tuned for serverless usage
-const POOL_OPTIONS = POSTGRES_URL
+/**
+ * Normalize SSL query params to silence pg warning and ensure predictable behavior.
+ *
+ * Default strategy: verify-full (recommended).
+ * Alternative: uselibpqcompat (set env PG_SSL_STRATEGY=uselibpqcompat)
+ */
+function normalizeSslParams(url, strategy = 'verify-full') {
+  if (!url) return url;
+
+  const hasSslmode = /([?&])sslmode=[^&]*/i.test(url);
+
+  if (strategy === 'verify-full') {
+    if (hasSslmode) {
+      return url.replace(/([?&])sslmode=[^&]*/i, '$1sslmode=verify-full');
+    }
+    return url + (url.includes('?') ? '&' : '?') + 'sslmode=verify-full';
+  }
+
+  if (strategy === 'uselibpqcompat') {
+    let out = url;
+    if (!/([?&])uselibpqcompat=[^&]*/i.test(out)) {
+      out += (out.includes('?') ? '&' : '?') + 'uselibpqcompat=true';
+    }
+    if (hasSslmode) {
+      out = out.replace(/([?&])sslmode=[^&]*/i, '$1sslmode=require');
+    } else {
+      out += '&sslmode=require';
+    }
+    return out;
+  }
+
+  return url;
+}
+
+// Choose SSL strategy (default verify-full)
+const SSL_STRATEGY = process.env.PG_SSL_STRATEGY || 'verify-full';
+const SAFE_POSTGRES_URL = normalizeSslParams(POSTGRES_URL, SSL_STRATEGY);
+
+console.log('[storage/db] ssl strategy:', SSL_STRATEGY);
+console.log('[storage/db] sslmode present in safe URL:', !!SAFE_POSTGRES_URL && /sslmode=/i.test(SAFE_POSTGRES_URL));
+
+/**
+ * Pool options tuned for serverless
+ */
+const POOL_OPTIONS = SAFE_POSTGRES_URL
   ? {
-      connectionString: POSTGRES_URL,
-      // Many managed DBs terminate TLS themselves; still set rejectUnauthorized = false
-      // so client will not fail in environments where full CA chain isn't available.
+      connectionString: SAFE_POSTGRES_URL,
       ssl: { rejectUnauthorized: false },
-      // Keep connections extremely small for serverless
-      max: 1,
+      max: 1, // keep extremely low for Neon/serverless
       idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 2000 // fail connection attempts fast
+      connectionTimeoutMillis: 2000
     }
   : null;
 
-// Reuse pool across warm invocations
+/**
+ * Reuse pool across warm invocations
+ */
 if (POOL_OPTIONS && !global.__pgPool) {
   global.__pgPool = new Pool(POOL_OPTIONS);
 
@@ -53,30 +98,34 @@ if (POOL_OPTIONS && !global.__pgPool) {
 
 const pool = global.__pgPool || null;
 
-// Table ensure guard (only once per process)
-let _tableEnsured = false;
+/**
+ * Ensure table exists only once per process
+ */
+let tableEnsured = false;
 
 /**
- * Run a pool.query with a timeout so queries cannot hang indefinitely.
- * Throws on timeout or query error.
+ * Query with timeout protection
  */
-async function queryWithTimeout(text, params = [], timeoutMs = 2500) {
-  if (!pool) throw new Error('no-pool');
-  const qPromise = pool.query(text, params);
-  const timeout = new Promise((_, reject) =>
+async function queryWithTimeout(sql, params = [], timeoutMs = 2500) {
+  if (!pool) throw new Error('no_pool');
+
+  const queryPromise = pool.query(sql, params);
+
+  const timeoutPromise = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('query_timeout')), timeoutMs)
   );
-  return Promise.race([qPromise, timeout]);
+
+  return Promise.race([queryPromise, timeoutPromise]);
 }
 
 /**
- * Ensure table exists (run once per process; failures are logged but do not throw).
+ * Ensure wl_3rd_info table exists
  */
 async function ensureTable() {
-  if (!pool) return;
-  if (_tableEnsured) return;
+  if (!pool || tableEnsured) return;
+
   try {
-    const createSql = `
+    await queryWithTimeout(`
       CREATE TABLE IF NOT EXISTS wl_3rd_info (
         platform TEXT NOT NULL,
         id TEXT NOT NULL,
@@ -87,35 +136,32 @@ async function ensureTable() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY(platform, id)
       )
-    `;
-    await queryWithTimeout(createSql, [], 3000);
-    _tableEnsured = true;
-    console.log('[storage/db] wl_3rd_info table ensured');
+    `, [], 3000);
+
+    tableEnsured = true;
+    console.log('[storage/db] table ensured');
   } catch (err) {
-    console.error('[storage/db] ensureTable failed:', err && err.message);
-    // do not rethrow — table ensure is best-effort
+    console.error('[storage/db] ensureTable failed:', err.message);
   }
 }
 
 /**
- * Upsert third-party user info.
- * Returns true on success, false on failure or if pool isn't available.
+ * Upsert third-party info safely
  */
 async function upsertThirdPartyInfo(platform, user) {
   try {
     if (!pool) {
-      console.warn('[storage/db] pool not available (skipping upsert)');
+      console.warn('[storage/db] no pool available, skipping upsert');
       return false;
     }
 
     if (!platform || !user || !user.id) {
-      console.warn('[storage/db] upsert called with invalid args', { platform, id: user && user.id });
+      console.warn('[storage/db] invalid upsert args');
       return false;
     }
 
     console.log('[storage/db] upsertThirdPartyInfo called:', platform, user.id);
 
-    // Ensure the table exists (best-effort)
     await ensureTable();
 
     const sql = `
@@ -131,28 +177,20 @@ async function upsertThirdPartyInfo(platform, user) {
         updated_at = CURRENT_TIMESTAMP
     `;
 
-    // Use a relatively short query timeout so a slow DB won't block
-    try {
-      const result = await queryWithTimeout(
-        sql,
-        [
-          platform,
-          user.id,
-          user.name || null,
-          user.email || null,
-          user.avatar || null,
-          user.url || null
-        ],
-        2000 // 2 seconds for upsert
-      );
-      console.log('[storage/db] upsert success, rowCount:', result && result.rowCount);
-      return true;
-    } catch (qerr) {
-      console.error('[storage/db] upsert query failed:', qerr && qerr.message);
-      return false;
-    }
+    const result = await queryWithTimeout(sql, [
+      platform,
+      user.id,
+      user.name || null,
+      user.email || null,
+      user.avatar || null,
+      user.url || null
+    ], 2000);
+
+    console.log('[storage/db] upsert success, rowCount:', result.rowCount);
+
+    return true;
   } catch (err) {
-    console.error('[storage/db] upsert failed (outer):', err && err.message);
+    console.error('[storage/db] upsert failed:', err.message);
     return false;
   }
 }
