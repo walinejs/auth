@@ -56,7 +56,7 @@ module.exports = class extends Base {
     });
     const userInfo = await request.get(USER_INFO_URL + '?' + qs.stringify({access_token, uid: tokenInfo.uid}), {json: true});
     
-    return this.formatUserResponse({
+    return await this.formatUserResponse({
       id: userInfo.idstr,
       name: userInfo.screen_name || userInfo.name,
       email: undefined,

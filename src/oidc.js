@@ -84,7 +84,7 @@ module.exports = class extends Base {
       : undefined;
     const profileUrl = user.profile || user.website || (typeof user.url === 'string' ? user.url : '');
     
-    return this.formatUserResponse({
+    return await this.formatUserResponse({
       id: user.sub,
       name: user.name || user.preferred_username || user.nickname,
       email: user.email || undefined,

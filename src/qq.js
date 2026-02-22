@@ -93,7 +93,7 @@ module.exports = class extends Base {
     }
 
     // 保证返回的用户信息一定有 id
-    return this.formatUserResponse({
+    return await this.formatUserResponse({
       id: tokenInfo.unionid || tokenInfo.openid, // 优先 unionid，没有就用 openid
       name: userInfo.nickname || 'QQ User',
       email: userInfo.email || `${tokenInfo.openid}@qq-uuid.com`,

@@ -58,7 +58,7 @@ module.exports = class extends Base {
       }
     }
     
-    return this.formatUserResponse({
+    return await this.formatUserResponse({
       id: userInfo.login,
       name: userInfo.name || userInfo.login,
       email: userInfo.email || undefined,

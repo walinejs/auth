@@ -152,6 +152,6 @@ module.exports = class extends Base {
       originalResponse: decoded
     };
 
-    return this.formatUserResponse(normalized, 'huawei');
+    return await this.formatUserResponse(normalized, 'huawei');
   }
 };
