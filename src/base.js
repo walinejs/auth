@@ -23,15 +23,11 @@ module.exports = class {
   }
 
   async formatUserResponse(userInfo, platform = '') {
-    console.log('[base] formatUserResponse called:', platform);
-
-    // Use waitUntil instead of setImmediate
-    waitUntil(
-      storage.upsertThirdPartyInfo(platform, userInfo)
-        .then(ok => console.log('[base] db result:', ok))
-        .catch(err => console.error('[base] db error:', err.message))
-    );
-
+    try {
+      await storage.upsertThirdPartyInfo(platform, userInfo);
+    } catch (e) {
+      console.error("Silent DB failure", e);
+    }
     return createUserResponse(userInfo, platform).get();
   }
 };
