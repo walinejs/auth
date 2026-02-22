@@ -3,7 +3,7 @@
  * Waline OAuth base handler with optional database storage
  */
 
-import { saveUserToDB } from './db.js';
+import { saveUserToDB } from './utils/storage/db.js';
 
 /**
  * Debug logger
