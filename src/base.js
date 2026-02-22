@@ -1,6 +1,6 @@
 const { createUserResponse } = require('./utils');
-const { waitUntil } = require('@vercel/functions');
 const storage = require('./utils/storage/db');
+const vercelFunctions = require('@vercel/functions');
 
 module.exports = class {
   constructor(ctx) {
