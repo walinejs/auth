@@ -23,24 +23,15 @@ module.exports = class {
   }
 
   async formatUserResponse(userInfo, platform = '') {
-
     console.log('[base] formatUserResponse called:', platform);
 
-    // fire-and-forget, never block response
-    setImmediate(() => {
-
+    // Use waitUntil instead of setImmediate
+    waitUntil(
       storage.upsertThirdPartyInfo(platform, userInfo)
-        .then(ok => {
-          console.log('[base] db result:', ok);
-        })
-        .catch(err => {
-          console.error('[base] db error:', err.message);
-        });
+        .then(ok => console.log('[base] db result:', ok))
+        .catch(err => console.error('[base] db error:', err.message))
+    );
 
-    });
-
-    // RETURN RESPONSE IMMEDIATELY
     return createUserResponse(userInfo, platform).get();
-
   }
 };
