@@ -22,19 +22,13 @@ module.exports = class {
     return baseUrl + url;
   }
 
-  /**
-   * formatUserResponse: attempt DB upsert but always return JSON.
-   * We await upsert with a strict timeout so Vercel won't hang.
-   */
   async formatUserResponse(userInfo, platform = '') {
     console.log('[base] formatUserResponse called:', { platform, id: userInfo && userInfo.id });
 
-    // Attempt DB upsert but do not allow it to block > TIMEOUT_MS
-    const TIMEOUT_MS = 1500;
+    const TIMEOUT_MS = parseInt(process.env.FORMAT_USER_DB_WAIT_MS || '1800', 10);
 
-    // If storage.upsertThirdPartyInfo returns/throws, swallow errors.
+    // Attempt DB upsert but do NOT allow it to block the response > TIMEOUT_MS
     try {
-      // Promise.race: either DB operation finishes or timeout resolves
       await Promise.race([
         (async () => {
           try {
@@ -45,66 +39,38 @@ module.exports = class {
               avatar: userInfo && userInfo.avatar,
               url: userInfo && userInfo.url
             });
-            console.log('[base] upsertThirdPartyInfo returned:', ok);
+            console.log('[base] storage.upsertThirdPartyInfo returned:', ok);
           } catch (err) {
-            console.error('[base] upsertThirdPartyInfo threw (caught):', err && err.message);
+            console.error('[base] storage.upsertThirdPartyInfo threw (caught):', err && err.message);
           }
         })(),
         sleep(TIMEOUT_MS)
       ]);
     } catch (err) {
-      // This shouldn't normally run because we race against sleep, but catch defensively
+      // should be rare: Promise.race will only reject if both sides reject
       console.error('[base] upsert race error (ignored):', err && err.message);
     }
 
-    // Build Waline response — defensively catch errors and ensure non-null result
+    // Build Waline response defensively
     try {
       const response = createUserResponse(userInfo, platform);
-      if (!response) {
-        console.warn('[base] createUserResponse returned null/undefined; returning fallback object');
-        return {
-          ok: true,
-          platform,
-          id: userInfo && userInfo.id,
-          name: userInfo && (userInfo.name || null),
-          avatar: userInfo && userInfo.avatar
-        };
-      }
-      if (typeof response.get === 'function') {
-        try {
-          const out = response.get();
-          if (out == null) {
-            console.warn('[base] response.get() returned null/undefined; using fallback');
-            return {
-              ok: true,
-              platform,
-              id: userInfo && userInfo.id,
-              name: userInfo && (userInfo.name || null),
-              avatar: userInfo && userInfo.avatar
-            };
-          }
-          return out;
-        } catch (err) {
-          console.error('[base] response.get() threw:', err && err.message);
-          return {
-            ok: true,
-            platform,
-            id: userInfo && userInfo.id,
-            name: userInfo && (userInfo.name || null),
-            avatar: userInfo && userInfo.avatar
-          };
+      if (response && typeof response.get === 'function') {
+        const out = response.get();
+        if (out == null) {
+          console.warn('[base] response.get() returned null/undefined; using fallback');
+          return { ok: true, platform, id: userInfo && userInfo.id, name: userInfo && userInfo.name || null };
         }
-      } else {
-        // response is a plain object
-        return response;
+        return out;
       }
+      if (response == null) {
+        console.warn('[base] createUserResponse returned null/undefined; using fallback');
+        return { ok: true, platform, id: userInfo && userInfo.id, name: userInfo && userInfo.name || null };
+      }
+      return response;
     } catch (err) {
-      console.error('[base] createUserResponse fatal error (caught):', err && err.message);
+      console.error('[base] createUserResponse failed:', err && err.message);
       if (err && err.stack) console.error(err.stack);
-      return {
-        ok: false,
-        error: 'formatUserResponse_failed'
-      };
+      return { ok: false, error: 'formatUserResponse_failed' };
     }
   }
 };
