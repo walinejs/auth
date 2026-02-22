@@ -3,7 +3,7 @@
  * Waline OAuth Base Provider with DB storage and debug
  */
 
-import { saveUserToDB } from './db.js';
+import { saveUserToDB } from './utils/storage/db.js';
 
 console.log('[storage/base] module loaded');
 
