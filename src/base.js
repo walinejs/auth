@@ -1,7 +1,7 @@
 // base.js
 const qs = require('querystring');
 const { createErrorResponse, createUserResponse } = require('./utils');
-const storage = require('./storage/db'); // your storage module (CommonJS)
+const storage = require('./utils/storage/db'); // your storage module (CommonJS)
 
 module.exports = class {
   constructor(ctx) {
