@@ -21,51 +21,138 @@ module.exports = class extends Base {
     };
   }
 
+  /**
+   * Step 1: Waline → Huawei authorize
+   */
   async redirect() {
-    const { state } = this.ctx.params;
-    // redirect_uri MUST NOT include state
-    const redirectUrl = this.getCompleteUrl('/huawei');
-    const url =
+
+    const { redirect, state } = this.ctx.params;
+
+    console.log('\n[Huawei] ===== AUTHORIZE START =====');
+    console.log('[Huawei] Waline redirect:', redirect);
+    console.log('[Huawei] Waline state:', state);
+    console.log('[Huawei] State type:', typeof state);
+
+    // redirect_uri must be THIS endpoint only
+    const redirect_uri = this.getCompleteUrl('/huawei');
+
+    console.log('[Huawei] Huawei redirect_uri:', redirect_uri);
+
+    const authorizeUrl =
       OAUTH_URL +
       '?' +
       qs.stringify({
         client_id: HUAWEI_ID,
-        redirect_uri: redirectUrl,
+        redirect_uri,
         response_type: 'code',
         scope: 'openid profile email',
-        state   // state only here
+        state: String(state)
       });
-    return this.ctx.redirect(url);
+
+    console.log('[Huawei] Final authorize URL:', authorizeUrl);
+    console.log('[Huawei] ===== AUTHORIZE END =====\n');
+
+    return this.ctx.redirect(authorizeUrl);
   }
 
+  /**
+   * Step 2: Huawei → exchange code for token
+   */
   async getAccessToken(code) {
-    const redirectUrl = this.getCompleteUrl('/huawei');
-    return request.post({
-      url: ACCESS_TOKEN_URL,
-      form: {
-        grant_type: 'authorization_code',
-        code,
-        client_id: HUAWEI_ID,
-        client_secret: HUAWEI_SECRET,
-        redirect_uri: redirectUrl
-      },
-      json: true
-    });
+
+    const { state } = this.ctx.params;
+
+    console.log('\n[Huawei] ===== TOKEN START =====');
+    console.log('[Huawei] Received code:', code);
+    console.log('[Huawei] Received state:', state);
+
+    // MUST match authorize redirect_uri exactly
+    const redirect_uri = this.getCompleteUrl('/huawei');
+
+    console.log('[Huawei] Token redirect_uri:', redirect_uri);
+
+    const formData = {
+      grant_type: 'authorization_code',
+      code,
+      client_id: HUAWEI_ID,
+      client_secret: HUAWEI_SECRET,
+      redirect_uri
+    };
+
+    console.log('[Huawei] Token request form:', formData);
+
+    let tokenResponse;
+
+    try {
+
+      tokenResponse = await request.post({
+        url: ACCESS_TOKEN_URL,
+        form: formData,
+        json: true
+      });
+
+    } catch (err) {
+
+      console.error('[Huawei] Token request failed:', err.message);
+
+      if (err.response) {
+        console.error('[Huawei] Huawei error response:', err.response.body);
+      }
+
+      throw err;
+    }
+
+    console.log('[Huawei] Token response:', tokenResponse);
+    console.log('[Huawei] ===== TOKEN END =====\n');
+
+    return tokenResponse;
   }
 
-  async getUserInfoByToken({ id_token }) {
+  /**
+   * Step 3: Extract user info from id_token
+   */
+  async getUserInfoByToken(tokenInfo) {
 
-    const decoded = jwtDecode(id_token);
+    console.log('\n[Huawei] ===== USERINFO START =====');
+    console.log('[Huawei] Raw tokenInfo:', tokenInfo);
 
-    console.log('[Huawei] decoded:', decoded);
+    const { id_token } = tokenInfo;
 
-    return this.formatUserResponse({
+    if (!id_token) {
+
+      console.error('[Huawei] ERROR: id_token missing');
+
+      throw new Error('Huawei id_token missing');
+    }
+
+    let decoded;
+
+    try {
+
+      decoded = jwtDecode(id_token);
+
+    } catch (err) {
+
+      console.error('[Huawei] JWT decode failed:', err);
+
+      throw err;
+    }
+
+    console.log('[Huawei] Decoded id_token:', decoded);
+
+    const user = {
       id: decoded.sub,
       name: decoded.name || decoded.email || decoded.sub,
-      email: decoded.email,
-      avatar: decoded.picture,
+      email: decoded.email || undefined,
+      url: undefined,
+      avatar: decoded.picture || undefined,
       originalResponse: decoded
-    }, 'huawei');
+    };
+
+    console.log('[Huawei] Normalized user:', user);
+    console.log('[Huawei] ===== USERINFO END =====\n');
+
+    return this.formatUserResponse(user, 'huawei');
   }
 
 };
