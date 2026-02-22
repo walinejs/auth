@@ -221,7 +221,7 @@ module.exports = class extends Base {
 
     // 返回结构化的 JSON 用户信息
     this.ctx.status = 200;
-    this.ctx.body = this.formatUserResponse({
+    this.ctx.body = await this.formatUserResponse({
       id: u.id,
       name: u.name || u.username,
       email: u.email || u.confirmed_email || `${u.id}@twitter-uuid.com`,
