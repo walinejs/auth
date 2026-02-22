@@ -21,24 +21,21 @@ module.exports = class extends Base {
     };
   }
 
-  /**
-   * Step 1: Waline → Huawei authorize
-   */
   async redirect() {
 
     const { redirect, state } = this.ctx.params;
 
-    console.log('\n[Huawei] ===== AUTHORIZE START =====');
     console.log('[Huawei] Waline redirect:', redirect);
-    console.log('[Huawei] Waline state:', state);
-    console.log('[Huawei] State type:', typeof state);
+    console.log('[Huawei] state:', state);
 
-    // redirect_uri must be THIS endpoint only
-    const redirect_uri = this.getCompleteUrl('/huawei');
+    const redirect_uri =
+      this.getCompleteUrl('/huawei') +
+      '?' +
+      qs.stringify({ redirect });
 
-    console.log('[Huawei] Huawei redirect_uri:', redirect_uri);
+    console.log('[Huawei] redirect_uri:', redirect_uri);
 
-    const authorizeUrl =
+    const url =
       OAUTH_URL +
       '?' +
       qs.stringify({
@@ -46,113 +43,55 @@ module.exports = class extends Base {
         redirect_uri,
         response_type: 'code',
         scope: 'openid profile email',
-        state: String(state)
+        state
       });
 
-    console.log('[Huawei] Final authorize URL:', authorizeUrl);
-    console.log('[Huawei] ===== AUTHORIZE END =====\n');
+    console.log('[Huawei] authorize URL:', url);
 
-    return this.ctx.redirect(authorizeUrl);
+    return this.ctx.redirect(url);
   }
 
-  /**
-   * Step 2: Huawei → exchange code for token
-   */
   async getAccessToken(code) {
 
-    const { state } = this.ctx.params;
+    const { redirect } = this.ctx.params;
 
-    console.log('\n[Huawei] ===== TOKEN START =====');
-    console.log('[Huawei] Received code:', code);
-    console.log('[Huawei] Received state:', state);
+    const redirect_uri =
+      this.getCompleteUrl('/huawei') +
+      '?' +
+      qs.stringify({ redirect });
 
-    // MUST match authorize redirect_uri exactly
-    const redirect_uri = this.getCompleteUrl('/huawei');
+    console.log('[Huawei] token redirect_uri:', redirect_uri);
 
-    console.log('[Huawei] Token redirect_uri:', redirect_uri);
+    const token = await request.post({
+      url: ACCESS_TOKEN_URL,
+      form: {
+        grant_type: 'authorization_code',
+        code,
+        client_id: HUAWEI_ID,
+        client_secret: HUAWEI_SECRET,
+        redirect_uri
+      },
+      json: true
+    });
 
-    const formData = {
-      grant_type: 'authorization_code',
-      code,
-      client_id: HUAWEI_ID,
-      client_secret: HUAWEI_SECRET,
-      redirect_uri
-    };
+    console.log('[Huawei] token response:', token);
 
-    console.log('[Huawei] Token request form:', formData);
-
-    let tokenResponse;
-
-    try {
-
-      tokenResponse = await request.post({
-        url: ACCESS_TOKEN_URL,
-        form: formData,
-        json: true
-      });
-
-    } catch (err) {
-
-      console.error('[Huawei] Token request failed:', err.message);
-
-      if (err.response) {
-        console.error('[Huawei] Huawei error response:', err.response.body);
-      }
-
-      throw err;
-    }
-
-    console.log('[Huawei] Token response:', tokenResponse);
-    console.log('[Huawei] ===== TOKEN END =====\n');
-
-    return tokenResponse;
+    return token;
   }
 
-  /**
-   * Step 3: Extract user info from id_token
-   */
   async getUserInfoByToken(tokenInfo) {
 
-    console.log('\n[Huawei] ===== USERINFO START =====');
-    console.log('[Huawei] Raw tokenInfo:', tokenInfo);
+    const decoded = jwtDecode(tokenInfo.id_token);
 
-    const { id_token } = tokenInfo;
+    console.log('[Huawei] decoded user:', decoded);
 
-    if (!id_token) {
-
-      console.error('[Huawei] ERROR: id_token missing');
-
-      throw new Error('Huawei id_token missing');
-    }
-
-    let decoded;
-
-    try {
-
-      decoded = jwtDecode(id_token);
-
-    } catch (err) {
-
-      console.error('[Huawei] JWT decode failed:', err);
-
-      throw err;
-    }
-
-    console.log('[Huawei] Decoded id_token:', decoded);
-
-    const user = {
+    return this.formatUserResponse({
       id: decoded.sub,
-      name: decoded.name || decoded.email || decoded.sub,
-      email: decoded.email || undefined,
-      url: undefined,
-      avatar: decoded.picture || undefined,
+      name: decoded.display_name || decoded.nickname || decoded.sub,
+      email: decoded.email,
+      avatar: decoded.picture,
       originalResponse: decoded
-    };
-
-    console.log('[Huawei] Normalized user:', user);
-    console.log('[Huawei] ===== USERINFO END =====\n');
-
-    return this.formatUserResponse(user, 'huawei');
+    }, 'huawei');
   }
 
 };
