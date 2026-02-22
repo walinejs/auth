@@ -26,7 +26,8 @@ function getPool() {
     max: Number(process.env.PG_POOL_MAX || 2), // keep small for serverless
     idleTimeoutMillis: Number(process.env.PG_IDLE_TIMEOUT || 30000),
     connectionTimeoutMillis: Number(process.env.PG_CONN_TIMEOUT || 2000),
-    ssl: process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false }
+    //ssl: process.env.PG_SSL === 'false' ? false : { rejectUnauthorized: false }
+    ssl: false
   });
 
   // Optional: if using Vercel Fluid, you can attach the pool for better lifecycle handling:
