@@ -34,41 +34,68 @@ module.exports = class {
     try {
       console.log('[base] formatUserResponse called:', { platform, id: userInfo && userInfo.id });
 
-      // Attempt DB upsert in best-effort mode.
+      // Fire-and-forget DB upsert with short timeout (best-effort)
       try {
         if (storage && typeof storage.upsertThirdPartyInfo === 'function') {
-          console.log('[base] calling storage.upsertThirdPartyInfo...');
-          const ok = await storage.upsertThirdPartyInfo(platform, {
-            id: userInfo && userInfo.id,
-            name: userInfo && userInfo.name,
-            email: userInfo && userInfo.email,
-            avatar: userInfo && userInfo.avatar,
-            url: userInfo && userInfo.url
-          });
-          if (ok) {
-            console.log('[base] upsertThirdPartyInfo succeeded for', platform, userInfo && userInfo.id);
-          } else {
-            console.warn('[base] upsertThirdPartyInfo returned false for', platform, userInfo && userInfo.id);
-          }
+          console.log('[base] launching storage.upsertThirdPartyInfo (fire-and-forget)');
+          // do not await — make it truly best-effort
+          void (async () => {
+            try {
+              // Optional: wrap in small timeout so a stuck query won't hang this microtask either
+              const upsertPromise = storage.upsertThirdPartyInfo(platform, {
+                id: userInfo && userInfo.id,
+                name: userInfo && userInfo.name,
+                email: userInfo && userInfo.email,
+                avatar: userInfo && userInfo.avatar,
+                url: userInfo && userInfo.url
+              });
+
+              // small safety timeout (ms)
+              const TIMEOUT_MS = 1500;
+              const result = await Promise.race([
+                upsertPromise,
+                new Promise(resolve => setTimeout(() => resolve(false), TIMEOUT_MS))
+              ]);
+
+              if (result) {
+                console.log('[base] upsertThirdPartyInfo succeeded for', platform, userInfo && userInfo.id);
+              } else {
+                console.warn('[base] upsertThirdPartyInfo returned false or timed out for', platform, userInfo && userInfo.id);
+              }
+            } catch (err) {
+              console.error('[base] upsertThirdPartyInfo inner error (ignored):', err && err.message);
+            }
+          })();
         } else {
           console.warn('[base] storage.upsertThirdPartyInfo not available; skipping DB upsert');
         }
       } catch (dbErr) {
-        // swallow DB errors so login flow continues
-        console.error('[base] upsertThirdPartyInfo error (ignored):', dbErr && dbErr.message);
-        if (dbErr && dbErr.stack) {
-          console.error(dbErr.stack);
-        }
+        // defensive — should never happen because inner closure already catches
+        console.error('[base] launching upsert failed (ignored):', dbErr && dbErr.message);
       }
 
-      // Build Waline user response
-      const response = createUserResponse(userInfo, platform);
-      return response.get();
+      // Build Waline user response — wrap defensively so we always return JSON-like object
+      try {
+        const response = createUserResponse(userInfo, platform);
+        return response.get();
+      } catch (err) {
+        console.error('[base] createUserResponse failed, returning fallback response:', err && err.message);
+        // return a minimal fallback Waline response so caller still gets JSON
+        return {
+          id: userInfo && userInfo.id,
+          name: userInfo && (userInfo.name || 'unknown'),
+          avatar: userInfo && userInfo.avatar,
+          platform: platform,
+          // other Waline expected fields — adapt as needed
+          ok: false,
+          _error: 'createUserResponse_failed'
+        };
+      }
     } catch (error) {
-      console.error('[base] formatUserResponse fatal error:', error && error.message);
+      console.error('[base] formatUserResponse fatal error (unexpected):', error && error.message);
       if (error && error.stack) console.error(error.stack);
-      // Re-throw because caller may rely on exceptions from createUserResponse
-      throw error;
+      // As a last resort return a JSON error object rather than throwing
+      return { ok: false, error: 'formatUserResponse_fatal' };
     }
   }
 };
