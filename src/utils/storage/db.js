@@ -1,17 +1,11 @@
-const { sql, createPool } = require('@vercel/postgres');
+// storage/db.js
+const { createPool } = require('@vercel/postgres');
 
-/**
- * STRATEGY: 
- * 1. Clean the POSTGRES_URL to remove ?sslmode=require which causes the 
- * "Pre data did not match expectation" error.
- * 2. Remove the ensureTable logic to prevent the "stuck" behavior.
- */
-
+// 1. Manually strip the sslmode to avoid the handshake conflict
 const rawUrl = process.env.POSTGRES_URL || '';
-// Remove any sslmode parameter that causes the handshake conflict
 const cleanUrl = rawUrl.replace(/([\?&])sslmode=[^&]+(&|$)/, '$1').replace(/\?$/, '');
 
-// Create a pool with the cleaned URL
+// 2. Create a persistent pool outside the handler for connection reuse
 const pool = createPool({
   connectionString: cleanUrl,
 });
@@ -20,35 +14,27 @@ async function upsertThirdPartyInfo(platform, user) {
   try {
     console.log('[storage/db] upsert start:', platform, user.id);
 
-    // Using pool.sql to ensure we use our cleaned connection string
-    await pool.sql`
-      INSERT INTO wl_3rd_info
-      (platform, id, name, email, avatar, url, updated_at)
-      VALUES
-      (${platform},
-       ${user.id},
-       ${user.name || null},
-       ${user.email || null},
-       ${user.avatar || null},
-       ${user.url || null},
-       CURRENT_TIMESTAMP)
-      ON CONFLICT (platform, id)
-      DO UPDATE SET
-        name = EXCLUDED.name,
-        email = EXCLUDED.email,
-        avatar = EXCLUDED.avatar,
-        url = EXCLUDED.url,
-        updated_at = CURRENT_TIMESTAMP
-    `;
+    // Use pool.query for the most stable background execution
+    await pool.query(
+      `INSERT INTO wl_3rd_info 
+       (platform, id, name, email, avatar, url, updated_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       ON CONFLICT (platform, id) 
+       DO UPDATE SET 
+         name = EXCLUDED.name, 
+         email = EXCLUDED.email, 
+         avatar = EXCLUDED.avatar, 
+         url = EXCLUDED.url, 
+         updated_at = CURRENT_TIMESTAMP`,
+      [platform, user.id, user.name || null, user.email || null, user.avatar || null, user.url || null]
+    );
 
     console.log('[storage/db] upsert success');
     return true;
   } catch (err) {
-    console.error('[storage/db] upsert failed:', err.message);
+    console.error('[storage/db] DB Query Error:', err.message);
     return false;
   }
 }
 
-module.exports = {
-  upsertThirdPartyInfo
-};
+module.exports = { upsertThirdPartyInfo };

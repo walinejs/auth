@@ -9,16 +9,14 @@ module.exports = class {
   async formatUserResponse(userInfo, platform = '') {
     console.log('[base] formatUserResponse called:', platform);
 
-    /**
-     * FIRE-AND-FORGET (SAFE)
-     * We trigger the promise but do NOT 'await' it. 
-     * We attach a .catch() to ensure an error doesn't kill the Node process.
-     */
-    storage.upsertThirdPartyInfo(platform, userInfo)
-      .then(ok => console.log('[base] db background task finished. Success:', ok))
-      .catch(err => console.error('[base] db background task crashed:', err.message));
+    // This is the ONLY way to do "fire-and-forget" safely on Vercel
+    waitUntil(
+      storage.upsertThirdPartyInfo(platform, userInfo)
+        .then(ok => console.log('[base] DB update result:', ok))
+        .catch(err => console.error('[base] DB background error:', err.message))
+    );
 
-    // Return the JSON response to the user immediately
+    // Return response immediately - the function stays alive in the background
     return createUserResponse(userInfo, platform).get();
   }
 
