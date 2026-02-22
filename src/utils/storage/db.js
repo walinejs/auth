@@ -1,63 +1,107 @@
-import pkg from 'pg';
-
-const { Pool } = pkg;
+// storage/db.js
+const { Pool } = require('pg');
 
 console.log('[storage/db] module loaded');
 
 const POSTGRES_URL =
   process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL;
 
 console.log('[storage/db] POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
 console.log('[storage/db] DATABASE_URL exists:', !!process.env.DATABASE_URL);
+console.log('[storage/db] using URL:', POSTGRES_URL ? 'YES' : 'NO');
 
-if (!POSTGRES_URL) {
-  console.error('[storage/db] NO DATABASE URL');
+let pool = null;
+
+if (POSTGRES_URL) {
+  pool = new Pool({
+    connectionString: POSTGRES_URL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
+
+  pool.on('connect', () => {
+    console.log('[storage/db] pool connected');
+  });
+
+  pool.on('error', err => {
+    console.error('[storage/db] pool error:', err.message);
+  });
+} else {
+  console.error('[storage/db] No POSTGRES_URL provided');
 }
 
-const pool = POSTGRES_URL
-  ? new Pool({
-      connectionString: POSTGRES_URL,
-      ssl: { rejectUnauthorized: false }
-    })
-  : null;
+/**
+ * Create table if not exists
+ */
+async function ensureTable() {
+  if (!pool) return;
 
-export async function saveUserToDB(user) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS wl_3rd_info (
+      platform TEXT NOT NULL,
+      id TEXT NOT NULL,
+      name TEXT,
+      email TEXT,
+      avatar TEXT,
+      url TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(platform, id)
+    )
+  `);
+}
 
-  console.log('[storage/db] saveUserToDB called');
-
-  if (!pool) {
-    throw new Error('Pool not initialized');
-  }
-
-  const client = await pool.connect();
-
+/**
+ * Upsert user info
+ */
+async function upsertThirdPartyInfo(platform, user) {
   try {
+    if (!pool) {
+      console.warn('[storage/db] pool not available');
+      return false;
+    }
 
-    const res = await client.query(
+    console.log('[storage/db] upsertThirdPartyInfo called:', platform, user.id);
+
+    await ensureTable();
+
+    const result = await pool.query(
       `
-      INSERT INTO wl_users (display_name, email, avatar, huawei)
-      VALUES ($1,$2,$3,$4)
-      ON CONFLICT (huawei)
+      INSERT INTO wl_3rd_info
+      (platform, id, name, email, avatar, url, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,CURRENT_TIMESTAMP)
+      ON CONFLICT (platform, id)
       DO UPDATE SET
-        display_name = EXCLUDED.display_name,
+        name = EXCLUDED.name,
         email = EXCLUDED.email,
-        avatar = EXCLUDED.avatar
-      RETURNING *
+        avatar = EXCLUDED.avatar,
+        url = EXCLUDED.url,
+        updated_at = CURRENT_TIMESTAMP
       `,
       [
-        user.display_name ?? null,
-        user.email ?? null,
-        user.avatar ?? null,
-        user.provider_id ?? null
+        platform,
+        user.id,
+        user.name || null,
+        user.email || null,
+        user.avatar || null,
+        user.url || null
       ]
     );
 
-    console.log('[storage/db] DB write success');
+    console.log('[storage/db] upsert success:', result.rowCount);
 
-    return res.rows[0];
-
-  } finally {
-    client.release();
+    return true;
+  } catch (err) {
+    console.error('[storage/db] upsert failed:', err.message);
+    console.error(err.stack);
+    return false;
   }
 }
+
+module.exports = {
+  upsertThirdPartyInfo
+};
+
+console.log('[storage/db] exports:', module.exports);
