@@ -17,7 +17,8 @@
     "jsonwebtoken": "^9.0.3",
     "jwt-decode": "^4.0.0",
     "pg": "^8.18.0",
-    "@vercel/postgres": "^0.1.0"
+    "@vercel/postgres": "^0.1.0",
+    "@vercel/functions": "^3.4.2"
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT"
