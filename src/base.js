@@ -1,4 +1,5 @@
 const { createUserResponse } = require('./utils');
+const qs = require('querystring');
 const storage = require('./utils/storage/db');
 const vercelFunctions = require('@vercel/functions');
 
@@ -40,7 +41,7 @@ module.exports = class {
     const cleanUrl = url.startsWith('/') ? url : `/${url}`;
     return baseUrl + cleanUrl;
   }
-  
+
   async getUserInfo() {
     const {code, redirect, state} = this.ctx.params;
     if(!code) {
