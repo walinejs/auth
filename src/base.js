@@ -40,4 +40,25 @@ module.exports = class {
     const cleanUrl = url.startsWith('/') ? url : `/${url}`;
     return baseUrl + cleanUrl;
   }
+  
+  async getUserInfo() {
+    const {code, redirect, state} = this.ctx.params;
+    if(!code) {
+      return this.redirect();
+    }
+
+    if(redirect) {
+      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
+    }
+
+    this.ctx.type = 'json';
+    try {
+      const accessTokenInfo = await this.getAccessToken(code);
+      const userInfo = await this.getUserInfoByToken(accessTokenInfo);
+      return this.ctx.body = userInfo;
+    } catch (error) {
+      this.ctx.status = error.statusCode || 500;
+      this.ctx.body = createErrorResponse(error.message, this.ctx.status).toJSON();
+    }
+  }
 };
