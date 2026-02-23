@@ -8,6 +8,7 @@
     "start": "vercel dev"
   },
   "dependencies": {
+    "jwt-decode": "^4.0.0",
     "koa": "3.1.1",
     "leancloud-storage": "4.15.2",
     "oauth-1.0a": "2.2.6",
