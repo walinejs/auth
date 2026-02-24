@@ -1,6 +1,6 @@
 # OAuth Center
 
-The easiest way to add user login to websites with [GitHub][GitHub], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo], [QQ][QQ], and [OpenID Connect (OIDC)][OIDC].
+The easiest way to add user login to websites with [GitHub][GitHub], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo], [QQ][QQ], [OpenID Connect (OIDC)][OIDC] and [Huawei][Huawei].
 
 ## Deploy Your Own
 
@@ -58,6 +58,13 @@ Optional: `OIDC_SCOPES` (default `openid profile email`).
 - Redirect URL: `<a href="<serverUrl>/oidc?redirect=&state=">Login with OIDC</a>`
 - Get user info: `GET <serverUrl>/oidc?code=`
 
+### Huawei
+
+`HUAWEI_ID` and `HUAWEI_SECRET` environment variables are required.
+
+- Redirect URL: `<a href="<serverUrl>/huawei?redirect=&state=">Login with Huawei</a>`
+- Get user info: `GET <serverUrl>/huawei?code=`
+
 
   [GitHub]: https://github.com
   [Twitter]: https://twitter.com
@@ -66,3 +73,4 @@ Optional: `OIDC_SCOPES` (default `openid profile email`).
   [Weibo]: https://weibo.com
   [QQ]: https://qq.com
   [OIDC]: https://openid.net/connect/
+  [Huawei]: https://developer.huawei.com/
