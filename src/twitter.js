@@ -144,16 +144,15 @@ module.exports = class extends Base {
       throw err;
     }
 
-    const { redirect } = stateData;
-    if (redirect) {
-      return this.ctx.redirect(
-        redirect +
-        (redirect.includes('?') ? '&' : '?') +
-        qs.stringify({ code, state: encodedState })
-      );
-    }
+    // const { redirect } = stateData;
+    // if (redirect) {
+    //   return this.ctx.redirect(
+    //     redirect +
+    //     (redirect.includes('?') ? '&' : '?') +
+    //     qs.stringify({ code, state: encodedState })
+    //   );
+    // }
 
-    // 到这里：我们要进行 Token 交换 + 获取用户信息
     let tokenInfo;
     try {
       tokenInfo = await this.getAccessToken({ code, stateData });
@@ -169,7 +168,6 @@ module.exports = class extends Base {
       throw err;
     }
 
-    // 获取用户信息
     let userInfo;
     try {
       userInfo = await this.getUserInfoByToken(tokenInfo.access_token);
