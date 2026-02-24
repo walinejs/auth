@@ -63,7 +63,7 @@ module.exports = class extends Base {
 
   async redirect() {
     const { redirect, state } = this.ctx.params;
-    const callbackUrl = this.getCompleteUrl('/x');
+    const callbackUrl = this.getCompleteUrl('/twitter');
 
     const { verifier, challenge } = xHelpers.generatePKCE();
 
