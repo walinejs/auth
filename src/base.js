@@ -8,6 +8,8 @@ module.exports = class {
   }
 
   async formatUserResponse(userInfo, platform = '') {
+    console.log('[base] formatUserResponse called:', platform);
+
     if (process.env.POSTGRES_URL) {
       try {
         const { waitUntil } = require('@vercel/functions');
@@ -21,9 +23,11 @@ module.exports = class {
       }
     }
 
+    // Construct response
     const response = createUserResponse(userInfo, platform);
     const result = response.get ? response.get() : response;
 
+    // THIS LOG MUST APPEAR
     console.log('[base] Returning response data:', JSON.stringify(result));
     
     return result;
@@ -73,9 +77,9 @@ module.exports = class {
       
       return this.ctx.body = userInfo;
     } catch (error) {
-      this.ctx.status = error.statusCode || 500;
-      console.error('[base] Error in getUserInfo:', error.message);
-      this.ctx.body = createErrorResponse(error.message, this.ctx.status).toJSON();
+      console.error('[OAuth Server] Error in getUserInfo:', error.message);
+      this.ctx.status = 500;
+      this.ctx.body = { error: error.message };
     }
   }
 };
