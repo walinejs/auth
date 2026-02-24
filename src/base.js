@@ -39,19 +39,38 @@ module.exports = class {
   }
 
   async getUserInfo() {
-    const {code, redirect, state} = this.ctx.params;
-    if(!code) {
+    const code = this.ctx.params?.code || this.ctx.query?.code;
+    const redirect = this.ctx.query?.redirect || this.ctx.params?.redirect;
+    const state = this.ctx.query?.state || this.ctx.params?.state;
+
+    if (!code) {
       return this.redirect();
     }
 
-    if(redirect) {
-      return this.ctx.redirect(redirect + (redirect.includes('?') ? '&' : '?') + qs.stringify({ code, state }));
+    /**
+     * FIX: Distinguish between a Browser Redirect (Full URL) 
+     * and a final UI Destination (Relative Path)
+     */
+    if (redirect && redirect.startsWith('http')) {
+      try {
+        const walineUrl = new URL(redirect);
+        walineUrl.searchParams.set('code', code);
+        if (state) walineUrl.searchParams.set('state', state);
+        
+        console.log('[OAuth Server] Browser phase: Redirecting to Waline:', walineUrl.toString());
+        return this.ctx.redirect(walineUrl.toString());
+      } catch (e) {
+        console.error('[OAuth Server] Invalid redirect URL:', redirect);
+      }
     }
 
+    // If it's a relative path (like /ui/profile) or missing, 
+    // we are in the background fetch phase. Proceed to get user data.
     this.ctx.type = 'json';
     try {
       const accessTokenInfo = await this.getAccessToken(code);
       const userInfo = await this.getUserInfoByToken(accessTokenInfo);
+      
       return this.ctx.body = userInfo;
     } catch (error) {
       this.ctx.status = error.statusCode || 500;
