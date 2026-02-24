@@ -63,7 +63,7 @@ module.exports = class extends Base {
 
   async redirect() {
     const { redirect, state } = this.ctx.params;
-    const callbackUrl = this.getCompleteUrl('/twitter');
+    const callbackUrl = this.getCompleteUrl('/x');
 
     const { verifier, challenge } = xHelpers.generatePKCE();
 
@@ -139,12 +139,9 @@ module.exports = class extends Base {
 
     const stateData = xHelpers.decodeStateData(encodedState);
     if (!stateData) {
-      this.ctx.status = 400;
-      this.ctx.body = { 
-        error: 'invalid_state',
-        message: 'OAuth state is invalid or could not be decoded.'
-      };
-      return;
+      const err = new Error('OAuth state is invalid or could not be decoded.');
+      err.statusCode = 400;
+      throw err;
     }
 
     const { redirect } = stateData;
@@ -161,23 +158,15 @@ module.exports = class extends Base {
     try {
       tokenInfo = await this.getAccessToken({ code, stateData });
     } catch (err) {
-      this.ctx.status = 500;
-      this.ctx.body = {
-        error: 'token_exchange_failed',
-        message: err.message || 'Failed to obtain access token from Twitter.',
-        details: err.error || null
-      };
-      return;
+      err.message = err.message || 'Failed to obtain access token from Twitter.';
+      err.statusCode = 500;
+      throw err;
     }
 
     if (!tokenInfo || !tokenInfo.access_token) {
-      this.ctx.status = 401;
-      this.ctx.body = {
-        error: 'no_access_token',
-        message: 'Twitter did not return an access token.',
-        raw: tokenInfo
-      };
-      return;
+      const err = new Error('Twitter did not return an access token.');
+      err.statusCode = 401;
+      throw err;
     }
 
     // 获取用户信息
@@ -185,26 +174,20 @@ module.exports = class extends Base {
     try {
       userInfo = await this.getUserInfoByToken(tokenInfo.access_token);
     } catch (err) {
-      this.ctx.status = 500;
-      this.ctx.body = {
-        error: 'user_info_fetch_failed',
-        message: err.message || 'Failed to fetch user info from Twitter.',
-        details: err.error || null
-      };
-      return;
+      err.message = err.message || 'Failed to fetch user info from Twitter.';
+      err.statusCode = err.statusCode || 500;
+      throw err;
     }
 
     const u = userInfo && userInfo.data ? userInfo.data : {};
 
-    // 返回结构化的 JSON 用户信息
-    this.ctx.status = 200;
-    this.ctx.body = this.formatUserResponse({
+    return {
       id: u.id,
       name: u.name || u.username,
       email: u.email || u.confirmed_email,
       url: u.url || (u.username ? `https://x.com/${u.username}` : undefined),
       avatar: u.profile_image_url || undefined,
       originalResponse: u
-    }, 'twitter');
+    };
   }
 };
