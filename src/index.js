@@ -6,4 +6,4 @@ exports.google = require('./google');
 exports.qq = require('./qq');
 exports.oidc = require('./oidc');
 exports.huawei = require('./huawei');
-exports.steam = require('./steam');
+//exports.steam = require('./steam');

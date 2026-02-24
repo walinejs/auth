@@ -1,4 +1,4 @@
-const { createUserResponse } = require('./utils');
+const { createUserResponse,createErrorResponse } = require('./utils');
 const qs = require('querystring');
 const storage = require('./utils/storage/db');
 
@@ -59,6 +59,7 @@ module.exports = class {
       return this.ctx.body = userInfo;
     } catch (error) {
       this.ctx.status = error.statusCode || 500;
+      console.error('[base] Error in getUserInfo:', error.message);
       this.ctx.body = createErrorResponse(error.message, this.ctx.status).toJSON();
     }
   }

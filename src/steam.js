@@ -3,7 +3,7 @@ const qs = require('querystring');
 const request = require('request-promise-native');
 
 const OPENID_CHECK_URL = 'https://steamcommunity.com/openid/login';
-const PLAYER_SUMMARY_URL = 'https://api.steamcommunity.com/ISteamUser/GetPlayerSummaries/v0002/';
+const PLAYER_SUMMARY_URL = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/';
 
 const { STEAM_KEY } = process.env;
 
@@ -13,6 +13,9 @@ module.exports = class extends Base {
    */
   static check() {
     return !!STEAM_KEY;
+  }
+  static info() {
+    return { origin: new URL(PLAYER_SUMMARY_URL).hostname };
   }
 
   /**
@@ -44,9 +47,11 @@ module.exports = class extends Base {
    * Instead, we validate the query parameters sent back by Steam.
    */
   async getAccessToken() {
-    // We verify the validity of the login by posting the data back to Steam
+    // Ensure we are using all parameters forwarded from Waline
+    const queryParams = this.ctx.query || this.ctx.params;
+
     const params = {
-      ...this.ctx.query,
+      ...queryParams,
       'openid.mode': 'check_authentication',
     };
 
@@ -55,15 +60,12 @@ module.exports = class extends Base {
       form: params,
     });
 
-    // Steam returns a text response containing "is_valid:true" if successful
     if (!response.includes('is_valid:true')) {
+      console.error('[Steam] Verification failed. Steam returned:', response);
       throw new Error('Steam OpenID verification failed');
     }
 
-    // The user's 64-bit Steam ID is at the end of the claimed_id URL
-    // Format: https://steamcommunity.com/openid/id/<STEAMID>
     const steamId = params['openid.claimed_id'].split('/').pop();
-    
     return { steamId };
   }
 
