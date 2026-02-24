@@ -10,12 +10,8 @@
   "dependencies": {
     "jwt-decode": "^4.0.0",
     "koa": "3.1.1",
-    "leancloud-storage": "^4.15.2",
-    "oauth-1.0a": "^2.2.6",
-    "oauth-sign": "^0.9.0",
     "request": "2.88.2",
-    "request-promise-native": "1.0.9",
-    "uuid": "^11.1.0"
+    "request-promise-native": "1.0.9"
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT",
