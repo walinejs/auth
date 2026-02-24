@@ -71,9 +71,7 @@ module.exports = class extends Base {
    * Instead, we validate the query parameters sent back by Steam.
    */
   async getAccessToken() {
-    // Ensure we are using all parameters forwarded from Waline
     const queryParams = this.ctx.query || this.ctx.params;
-
     const params = {
       ...queryParams,
       'openid.mode': 'check_authentication',
@@ -91,6 +89,7 @@ module.exports = class extends Base {
     }
 
     const steamId = params['openid.claimed_id'].split('/').pop();
+    console.log('[Steam] Verified SteamID:', steamId);
     return { steamId };
   }
 
