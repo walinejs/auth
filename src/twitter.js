@@ -144,14 +144,14 @@ module.exports = class extends Base {
       throw err;
     }
 
-    // const { redirect } = stateData;
-    // if (redirect) {
-    //   return this.ctx.redirect(
-    //     redirect +
-    //     (redirect.includes('?') ? '&' : '?') +
-    //     qs.stringify({ code, state: encodedState })
-    //   );
-    // }
+    const { redirect } = stateData;
+    if (redirect && this.ctx.headers['user-agent'] !== '@waline') {
+      return this.ctx.redirect(
+        redirect +
+        (redirect.includes('?') ? '&' : '?') +
+        qs.stringify({ code, state: encodedState })
+      );
+    }
 
     let tokenInfo;
     try {
