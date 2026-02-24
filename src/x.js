@@ -181,7 +181,7 @@ module.exports = class extends Base {
 
     const u = userInfo && userInfo.data ? userInfo.data : {};
 
-    return {
+    return this.ctx.body = {
       id: u.id,
       name: u.name || u.username,
       email: u.email || u.confirmed_email,
