@@ -20,10 +20,6 @@
         {
             "name": "qq",
             "origin": "graph.qq.com"
-        },
-        {
-            "name": "huawei",
-            "origin": "oauth-login.cloud.huawei.com"
         }
     ]
 }
