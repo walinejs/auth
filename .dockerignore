@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+npm-debug.log
+.vercel
+.env
+*.log
+coverage
+.eslintrc
+renovate.json
+Dockerfile
+.dockerignore
+README.md
