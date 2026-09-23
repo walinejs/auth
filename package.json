@@ -15,5 +15,5 @@
   },
   "repository": "https://github.com/walinejs/auth",
   "license": "MIT",
-  "packageManager": "npm@11.18.0+sha512.4faecce0be70366d1c67b1012c4adc1246354a6cc45bf589f92003073b05518d547403df1475c542d67a4845e22b4fafcd7cac0af02c7a96cc6814f09eb003fb"
+  "packageManager": "npm@12.1.0+sha512.17286eeb6a4dc7bd180acff9f9d1262504c556648ac2fa39080d2abc19060d1a686f8d8c27a1b6450dad77178a3389d89c8643aa4600c4482ab687a39fd406b5"
 }
