@@ -2,6 +2,43 @@
 
 The easiest way to add user login to websites with [GitHub][GitHub], [Twitter][Twitter], [Facebook][Facebook], [Google][Google], [Weibo][Weibo], [QQ][QQ], [OpenID Connect (OIDC)][OIDC] and [Huawei][Huawei].
 
+## Run with Docker
+
+A prebuilt multi-arch image (`linux/amd64` + `linux/arm64`) is published on Docker Hub: [`jianqiao0313/waline-auth`](https://hub.docker.com/r/jianqiao0313/waline-auth) (tags: `latest`, `1.1.0`).
+
+```bash
+docker run -d --name waline-auth -p 3000:3000 \
+  -e GITHUB_ID=your_github_id \
+  -e GITHUB_SECRET=your_github_secret \
+  jianqiao0313/waline-auth:latest
+```
+
+The service then listens on `http://localhost:3000`. Visit `/` to see the enabled providers, then call e.g. `GET http://localhost:3000/github?code=...` to fetch user info.
+
+Each provider is turned on by passing its credentials as environment variables — see [How To Use](#how-to-use) below for the full list (`GITHUB_*`, `GOOGLE_*`, `FACEBOOK_*`, `WEIBO_*`, `QQ_*`, `TWITTER_*` + `LEAN_*`, `OIDC_*`, `HUAWEI_*`). Override the listening port with `-e PORT=8080`.
+
+### docker compose
+
+```yaml
+services:
+  waline-auth:
+    image: jianqiao0313/waline-auth:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GITHUB_ID: your_github_id
+      GITHUB_SECRET: your_github_secret
+      # add other providers as needed, e.g. GOOGLE_ID / GOOGLE_SECRET ...
+```
+
+### Build it yourself
+
+```bash
+docker build -t waline-auth .
+docker run -d -p 3000:3000 -e GITHUB_ID=... -e GITHUB_SECRET=... waline-auth
+```
+
 ## Deploy Your Own
 
 Deploy your own Waline project with Vercel.
